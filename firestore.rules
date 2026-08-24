@@ -1,0 +1,96 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net: default-deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Common helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        request.auth.token.email == "wesam.elshenawey@gmail.com"
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // 1. Users collection
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // 2. Clients collection
+    match /clients/{clientId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // 3. Cases collection
+    match /cases/{caseId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // 4. Sessions collection
+    match /sessions/{sessionId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // 5. Software Licenses
+    match /licenses/{licenseId} {
+      // Anyone can verify their license metadata if they have the key
+      allow get: if true;
+      allow list: if isSignedIn();
+      // Only Wesam can create, update or delete licenses
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // 6. Activation Requests
+    match /activation_requests/{requestId} {
+      allow get: if true;
+      allow list: if isSignedIn();
+      allow create: if true; // Any device can request activation/license matching
+      allow update, delete: if isSignedIn();
+    }
+
+    // 7. Email Notifications
+    match /email_notifications/{notificationId} {
+      allow read, create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // 8. Opponents collection
+    match /opponents/{opponentId} {
+      allow read, create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // 9. Leads collection
+    match /leads/{leadId} {
+      allow read, create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // 10. Synced Phone Contacts
+    match /synced_contacts/{contactId} {
+      allow read, create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+  }
+}

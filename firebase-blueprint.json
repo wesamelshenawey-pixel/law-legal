@@ -1,0 +1,160 @@
+{
+  "entities": {
+    "PlatformUser": {
+      "title": "Platform User Credentials",
+      "description": "User login credentials keyed by phone number, with verification status and role",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "passwordHash": { "type": "string" },
+        "role": { "type": "string" },
+        "isVerified": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "phone", "passwordHash", "role", "isVerified", "createdAt"]
+    },
+    "ClientProfile": {
+      "title": "Client Legal Profile",
+      "description": "Information regarding the law firm's clients",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "serialNumber": { "type": "number" },
+        "name": { "type": "string" },
+        "nationalId": { "type": "string" },
+        "poaNumber": { "type": "string" },
+        "poaLetter": { "type": "string" },
+        "poaYear": { "type": "number" },
+        "poaOffice": { "type": "string" },
+        "caseNumber": { "type": "string" },
+        "caseYear": { "type": "number" },
+        "competentCourt": { "type": "string" },
+        "subject": { "type": "string" },
+        "remainingFees": { "type": "number" },
+        "whatsapp": { "type": "string" },
+        "email": { "type": "string" },
+        "password": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "serialNumber", "name", "nationalId", "createdAt"]
+    },
+    "CaseRecord": {
+      "title": "Court Case Record",
+      "description": "Detailed log of a legal casing inside Egyptian courts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "serialNumber": { "type": "number" },
+        "caseNumber": { "type": "string" },
+        "caseYear": { "type": "number" },
+        "competentCourt": { "type": "string" },
+        "courtType": { "type": "string" },
+        "subject": { "type": "string" },
+        "clientName": { "type": "string" },
+        "clientRole": { "type": "string" },
+        "opponentName": { "type": "string" },
+        "nextSessionDate": { "type": "string" },
+        "details": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "serialNumber", "caseNumber", "caseYear", "clientName", "createdAt"]
+    },
+    "SessionRecord": {
+      "title": "Court Session Record",
+      "description": "Court sessions linked to a case for alerts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "caseId": { "type": "string" },
+        "date": { "type": "string" },
+        "timeType": { "type": "string" },
+        "status": { "type": "string" },
+        "decision": { "type": "string" },
+        "requiredWork": { "type": "string" }
+      },
+      "required": ["id", "caseId", "date", "status"]
+    },
+    "LicenseRecord": {
+      "title": "Software Copy License",
+      "description": "Licensing document restricting copy usage to particular devices and phone registers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The custom activation or license key" },
+        "holderName": { "type": "string" },
+        "holderPhone": { "type": "string" },
+        "maxDevices": { "type": "number" },
+        "maxUsers": { "type": "number" },
+        "approvedDevices": { "type": "array" },
+        "registeredPhones": { "type": "array" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "holderName", "maxDevices", "maxUsers", "approvedDevices", "registeredPhones", "status"]
+    },
+    "ActivationRequest": {
+      "title": "Device Activation Request",
+      "description": "Stores pending activation requests from non-licensed device fingerprints for Admin one-click approval",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "licenseKey": { "type": "string" },
+        "deviceName": { "type": "string" },
+        "deviceFingerprint": { "type": "string" },
+        "requestPhone": { "type": "string" },
+        "requestName": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "licenseKey", "deviceFingerprint", "status", "createdAt"]
+    },
+    "EmailNotificationRecord": {
+      "title": "Client Email Notification Record",
+      "description": "Logs email notifications dispatched to clients on case status change or session dates",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "toEmail": { "type": "string" },
+        "clientName": { "type": "string" },
+        "caseNumber": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "updateType": { "type": "string" },
+        "status": { "type": "string" },
+        "sentAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "toEmail", "clientName", "title", "updateType", "status", "sentAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "PlatformUser",
+      "description": "User profiles and login details mapped to standard uids"
+    },
+    "/clients/{clientId}": {
+      "schema": "ClientProfile",
+      "description": "Law office active clients records"
+    },
+    "/cases/{caseId}": {
+      "schema": "CaseRecord",
+      "description": "Case lawsuit folders"
+    },
+    "/sessions/{sessionId}": {
+      "schema": "SessionRecord",
+      "description": "Case calendar updates"
+    },
+    "/licenses/{licenseId}": {
+      "schema": "LicenseRecord",
+      "description": "Licensed copies sold by Wesam with device approvals"
+    },
+    "/activation_requests/{requestId}": {
+      "schema": "ActivationRequest",
+      "description": "Pending requests to activate a device on a copy"
+    },
+    "/email_notifications/{notificationId}": {
+      "schema": "EmailNotificationRecord",
+      "description": "Dispatched email notification records"
+    }
+  }
+}

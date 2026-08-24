@@ -1,0 +1,6 @@
+{
+  "name": "مكتب الأستاذ وسام الشناوي المحامي",
+  "description": "النظام الإداري والتقني المتكامل لإدارة مكتب المحاماة والذكاء الاصطناعي والمزامنة السحابية للصحف والقضايا والأتعاب والجلسات",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

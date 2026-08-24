@@ -1,0 +1,68 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800;900&family=Amiri:ital,wght@0,400;0,700;1,400;1,700&family=Inter:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-amber-50: var(--accent-50, #fffbeb);
+  --color-amber-100: var(--accent-100, #fef3c7);
+  --color-amber-200: var(--accent-200, #fde68a);
+  --color-amber-300: var(--accent-300, #fcd34d);
+  --color-amber-400: var(--accent-400, #fbbf24);
+  --color-amber-500: var(--accent-500, #f59e0b);
+  --color-amber-600: var(--accent-600, #d97706);
+  --color-amber-700: var(--accent-700, #b45309);
+  --color-amber-800: var(--accent-800, #92400e);
+  --color-amber-900: var(--accent-900, #78350f);
+  --color-amber-950: var(--accent-950, #451a03);
+
+  --font-sans: "Cairo", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Amiri", Georgia, serif;
+  --animate-ripple: ripple 0.6s linear forwards;
+  --animate-pulse-subtle: pulse-subtle 2s infinite ease-in-out;
+  --animate-scale-up: scale-up 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+
+  @keyframes ripple {
+    0% {
+      transform: scale(0);
+      opacity: 0.85;
+    }
+    100% {
+      transform: scale(5);
+      opacity: 0;
+    }
+  }
+  @keyframes pulse-subtle {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+  }
+  @keyframes scale-up {
+    from {
+      transform: scale(0.95);
+      opacity: 0;
+    }
+    to {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+}
+
+body {
+  background-color: #f1f5f9;
+  font-family: var(--font-sans);
+  color: #0f172a;
+}
+
+/* Custom golden gradient visual helpers */
+.text-gold-gradient {
+  background: linear-gradient(135deg, #fcd34d 0%, #fbbf24 60%, #b45309 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.border-luxury-gold {
+  border-color: rgba(212, 175, 55, 0.25);
+}
+
+.card-glare {
+  background: radial-gradient(circle at top right, rgba(212, 175, 55, 0.04) 0%, transparent 40%);
+}
