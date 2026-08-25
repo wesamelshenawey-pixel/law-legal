@@ -124,7 +124,7 @@ export default function LexmarkDeviceStudio({
         // Mock legal document lines
         ctx.font = "20px Tahoma, sans-serif";
         const lines = [
-          "بناءً على طلب الأستاذ / وسام حمدي الشناوي - المحامي المقيد بالنقض والدستورية العليا",
+          "بناءً على طلب الأستاذ / المحامي - المحامي المقيد بالنقض والدستورية العليا",
           "في الدعوى رقم 4582 لسنة 2026 جنح مستأنف الزقازيق",
           "الموضوع: مذكرة دفاع في جنحة إيصال أمانة / طعن بالتزوير صلباً وتوقيعاً",
           "وقائع الدعوى: حيث أقام الخصم دعواه الماثلة بموجب سند مجحود...",
@@ -150,7 +150,7 @@ export default function LexmarkDeviceStudio({
 
         ctx.fillStyle = "#b45309";
         ctx.font = "bold 20px Tahoma, sans-serif";
-        ctx.fillText("مكتب الأستاذ وسام الشناوي", canvas.width / 2, 1240);
+        ctx.fillText("مكتب الأستاذ المحامي", canvas.width / 2, 1240);
         ctx.fillText("محامٍ بالنقض", canvas.width / 2, 1275);
       }
 
@@ -161,7 +161,7 @@ export default function LexmarkDeviceStudio({
 محكمة الزقازيق الابتدائية / مأمورية ههيا
 رول ومذكرة قضائية مفحوصة عبر Lexmark X654de
 الدعوى: 4582 لسنة 2026 جنح
-الأستاذ وسام حمدي الشناوي - المحامي بالنقض
+الأستاذ المحامي - المحامي بالنقض
 الدفوع:
 1. انتفاء ركن التسليم بالمادة 341 عقوبات.
 2. بطلان الاستكتاب ومضاهاة الخطوط.
@@ -584,7 +584,7 @@ export default function LexmarkDeviceStudio({
                     onChange={(e) => setApplyOfficeWatermark(e.target.checked)}
                     className="rounded text-amber-500 focus:ring-0"
                   />
-                  <span>إدراج خاتم مكتب الأستاذ وسام الشناوي</span>
+                  <span>إدراج خاتم مكتب الأستاذ المحامي</span>
                 </label>
               </div>
             </div>

@@ -25,7 +25,7 @@ export default function AppLogo({
             الأستاذ
           </span>
           <span className={`font-black text-sm ${textColor} tracking-tight font-sans`}>
-            وسام حمدي الشناوي
+            المحامي
           </span>
           <span className="text-[10px] font-bold text-amber-500/90 font-sans">
             المحامي بالنقض والدستورية العليا

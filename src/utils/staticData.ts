@@ -150,6 +150,48 @@ export const INITIAL_CASES: CaseRecord[] = [
       maxUsd: "600",
       recommendation: "القضية غنية بالثغرات المتعلّقة بصفة العرض القانوني والصلح الفعلي، أتعاب متوسطة وتتطلب جهد كتابة مذكرات وحضور جلسة العرض."
     },
+    stage: "first_session",
+    timeline: [
+      {
+        id: "m-1-1",
+        type: "registered",
+        title: "قيد الدعوى وتسجيلها رسميّاً",
+        titleEn: "Case Registered",
+        date: "2026-05-10",
+        status: "completed",
+        decisionOrNotes: "تم قيد الجنحة بجدول النيابة العامة وإحالتها إلى محكمة جنح ههيا وتحديد جلسة مرافعة عاجلة.",
+        circuitOrCourt: "نيابة ههيا الجزئية / جدول الجنح",
+        completedAt: "2026-05-10T11:00:00Z"
+      },
+      {
+        id: "m-1-2",
+        type: "first_session",
+        title: "الجلسة الأولى والمرافعة الافتتاحية",
+        titleEn: "First Session",
+        date: "2026-06-15",
+        status: "in_progress",
+        decisionOrNotes: "حضور المتهم بشخصه مع المحامي الأستاذ وسام، وتقديم إنذار عرض المنقولات وطلب التأجيل لسداد الرسم والتصريح بالمعاينة.",
+        circuitOrCourt: "الدائرة الثالثة جنح - قاعة رقم 2"
+      },
+      {
+        id: "m-1-3",
+        type: "judgment",
+        title: "صدور الحكم القضائي الابتدائي",
+        titleEn: "Judgment Issued",
+        date: "2026-07-20",
+        status: "upcoming",
+        decisionOrNotes: "جلسة النطق بالحكم المترقبة بعد إتمام المعاينة واستيفاء شروط التسليم القانوني للمنقولات."
+      },
+      {
+        id: "m-1-4",
+        type: "appeal",
+        title: "تقرير الطعن والاستئناف / النقض",
+        titleEn: "Appeal Filed",
+        date: "2026-08-05",
+        status: "pending",
+        decisionOrNotes: "الاستعداد لتقرير المعارضة الاستئنافية في حال صدور حكم غيابي أو استئناف النيابة."
+      }
+    ],
     createdAt: "2026-06-01T08:00:00Z"
   },
   {
@@ -174,6 +216,50 @@ export const INITIAL_CASES: CaseRecord[] = [
       maxUsd: "500",
       recommendation: "الأتعاب المستحقة عادلة للغاية نظراً لتوفر المستندات الثبوتية والمشروع يسير مع تحري المباحث الإيجابي."
     },
+    stage: "judgment",
+    timeline: [
+      {
+        id: "m-2-1",
+        type: "registered",
+        title: "إيداع صحيفة الدعوى والتسجيل",
+        titleEn: "Case Registered",
+        date: "2026-04-12",
+        status: "completed",
+        decisionOrNotes: "تم قيد صحيفة دعوى النفقة بجدول محكمة الأسرة بعد إتمام مرحلة تسوية المنازعات الأسرية.",
+        circuitOrCourt: "محكمة أسرة ههيا - مكتب تسوية المنازعات",
+        completedAt: "2026-04-12T09:30:00Z"
+      },
+      {
+        id: "m-2-2",
+        type: "first_session",
+        title: "الجلسة الأولى وإعلان الخصم",
+        titleEn: "First Session",
+        date: "2026-05-18",
+        status: "completed",
+        decisionOrNotes: "حضر وكيل المدعية وقدم أصل صحيفة الدعوى معلنة، وقررت المحكمة التأجيل لورود تحري المباحث عن دخل الزوج.",
+        circuitOrCourt: "دائرة أسرة بندر ههيا",
+        completedAt: "2026-05-18T12:00:00Z"
+      },
+      {
+        id: "m-2-3",
+        type: "judgment",
+        title: "صدور حكم النفقة الموضوعي",
+        titleEn: "Judgment Issued",
+        date: "2026-06-22",
+        status: "in_progress",
+        decisionOrNotes: "جلسة مرافعة ختامية لحجز الدعوى للحكم مع تقديم مذكرة ختامية بحساب متوسطات دخل المدعى عليه.",
+        circuitOrCourt: "دائرة أسرة بندر ههيا - قاعة 1"
+      },
+      {
+        id: "m-2-4",
+        type: "appeal",
+        title: "استئناف الحكم لزيادة المفروض",
+        titleEn: "Appeal Filed",
+        date: "2026-07-28",
+        status: "upcoming",
+        decisionOrNotes: "إعداد صحيفة استئناف أمام محكمة استئناف عالي الزقازيق لطلب زيادة مبلغ النفقة الشهرية."
+      }
+    ],
     createdAt: "2026-06-02T10:30:00Z"
   }
 ];

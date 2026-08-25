@@ -22,10 +22,14 @@ const ai = new GoogleGenAI({
   },
 });
 
-// AI SYSTEM INSTRUCTIONS FOR ROYAL EGYPTIAN ATTORNEY SERVICES
-const LAWYER_SYSTEM_INSTRUCTION = `أنت مساعد الذكاء الاصطناعي القانوني المتطور الخاص بمكتب الأستاذ وسام الشناوي المحامي في مصر. 
-تلتزم دائماً بتقديم المشورة القانونية الدقيقة والصياغة وفقاً للقانون المصري، بأسلوب مهني ومحترم ومفصل. 
-يمكنك كتابة مذكرات دفاع، عقود، تظلمات، استخراج ثغرات القضايا، وتقدير الأتعاب المتوسطة للقضايا بناء على موضوع الجلسة.`;
+// AI SYSTEM INSTRUCTIONS FOR ROYAL EGYPTIAN ATTORNEY SERVICES & EGYPTIAN LAWYER AI
+const LAWYER_SYSTEM_INSTRUCTION = `أنت المحامي المصري الذكي (Egyptian Lawyer AI) والمساعد القانوني الرقمي المعتمد بمكتب الأستاذ وسام الشناوي المحامي بالنقض والدستورية العليا.
+تلتزم دائماً بتقديم المشورة القانونية والصياغة الفقهية والقضائية الدقيقة وفقاً لأحدث التشريعات المصرية المعمول بها لعام 2026:
+1. 🚨 قانون العقوبات المصري رقم 58 لسنة 1937 وتعديلاته وقانون الإجراءات الجنائية رقم 150 لسنة 1950 (جرائم خيانة الأمانة م 341، النصب م 336، الشيكات م 534 تجارة، أحوال التلبس م 30، بطلان القبض والتفتيش، انقضاء الدعوى الجنائية وسقوط العقوبة).
+2. 📜 القانون المدني المصري رقم 131 لسنة 1948 وتعديلاته وقانون المرافعات رقم 13 لسنة 1968 (العقد شريعة المتعاقدين م 147، المسؤولية التقصيرية والتعويض م 163، الفسخ والشرط الجزائي م 158، دعاوى صحة ونفاذ وصحة التوقيع، وقانون الشهر العقاري 9 لسنة 2022).
+3. 👨‍👩‍👧‍👦 قوانين الأحوال الشخصية ومحاكم الأسرة المصرية (القوانين 25 لسنة 1920، 25 لسنة 1929، 1 لسنة 2000 الخاصة بالخلع م 20، وقانون 10 لسنة 2004 بإنشاء محاكم الأسرة، وقواعد النفقات والأجور وقائمة منقولات الزوجية والحضانة ومسكن الزوجية والحبس لمتجمد النفقة م 76 مكرر).
+4. 🏛️ موسوعة أحكام ومبادئ محكمة النقض المصرية (الدوائر الجنائية، المدنية، الإيجارات، الأحوال الشخصية، والعمالية) والمحكمة الدستورية العليا ومجلس الدولة.
+التزم دائماً بذكر أرقام المواد القانونية ومبادئ محكمة النقض الواجبة التطبيق في كل استشارة ومذكرة وصياغة تقدمها.`;
 
 // API routes for AI legal capabilities
 app.post("/api/ai/extract-document-text", async (req, res) => {
@@ -79,20 +83,34 @@ app.post("/api/ai/ocr", async (req, res) => {
                      imageBase64.startsWith("data:image/png") ? "image/png" : "image/jpeg";
     
     let defaultInstruction = "استخرج النص العربي الكامل من هذه الصورة أو الوثيقة القضائية بدقة متناهية مع معالجة الخطوط اليدوية وتنسيق الفقرات.";
-    if (mode === "tables") {
+    if (mode === "national_id" || mode === "id_card") {
+      defaultInstruction = `أنت نظام استخراج بيانات دقيق. قم بتحليل صورة بطاقة الرقم القومي المرفقة واستخرج البيانات التالية فقط: الاسم الكامل، الرقم القومي المكون من 14 رقماً، العنوان بالتفصيل، والمهنة. قم بإرجاع النتيجة حصراً بتنسيق JSON باستخدام المفاتيح التالية: name, national_id, address, profession. لا تضف أي نص تمهيدي أو ختامي.`;
+    } else if (mode === "contract" || mode === "contract_archive") {
+      defaultInstruction = `قم بقراءة هذا المستند القانوني واستخراج النص بالكامل بدقة عالية. حافظ على الهيكل العام للفقرات والترقيم كما هو موجود في الصورة الأصلية. تجاهل أي أختام، توقيعات، أو علامات مائية لا تشكل جزءاً من النص المقروء. إذا واجهت كلمة غير واضحة تماماً بسبب جودة المسح الضوئي، ضعها بين قوسين معقوفين [غير مقروء].`;
+    } else if (mode === "court_verdict" || mode === "court_session" || mode === "session_minutes") {
+      defaultInstruction = `حلل هذه الصورة المأخوذة من مستند قضائي (محضر جلسة أو حكم محكمة). استخرج البيانات الأساسية وضعها في قائمة واضحة تتضمن:
+
+رقم القضية وسنة التقييد.
+
+نوع القضية ودرجة المحكمة.
+
+المحكمة المختصة (مكان الانعقاد).
+
+أسماء أطراف النزاع.
+
+منطوق الحكم أو القرار الصادر في الجلسة (إن وجد).`;
+    } else if (mode === "handwritten" || mode === "handwriting" || mode === "draft") {
+      defaultInstruction = `الصورة المرفقة تحتوي على نص مكتوب بخط اليد. قم بنسخ النص المكتوب بدقة. في حال وجود أخطاء إملائية ناتجة عن سرعة الكتابة، قم بتصحيحها بناءً على السياق القانوني للجملة، مع كتابة الكلمة الأصلية كما بدت لك في ملاحظة صغيرة في نهاية النص.`;
+    } else if (mode === "tables") {
       defaultInstruction = "استخرج كافة الجداول، البنود المالية، تواريخ الجلسات، الأرقام والبيانات المجدولة بدقة تامة وحولها إلى جداول نصية واضحة ومنظمة.";
     } else if (mode === "poa") {
       defaultInstruction = "هذا توكيل رسمي أو محرر توثيق. استخرج بدقة: اسم الموكل، الرقم القومي، رقم التوكيل وحرفه وسنته، مكتب التوثيق، اسم الوكيل، الصلاحيات القانونية الممنوحة.";
-    } else if (mode === "contract") {
-      defaultInstruction = "هذا عقد أو اتفاقية قانونية. استخرج بدقة: أطراف العقد (الطرف الأول، الطرف الثاني)، موضوع العقد، البنود والالتزامات، المبالغ المالية، الشروط الجزائية، وتاريخ التوقيع.";
-    } else if (mode === "court_verdict") {
-      defaultInstruction = "هذا حكم قضائي أو عريضة دعوى. استخرج بدقة: المحكمة المختصة، الدائرة، رقم القضية وسنتها، أسماء الخصوم والمدعين، منطوق الحكم، والأسباب والطلبات.";
     }
 
     const extractionPrompt = customPrompt || defaultInstruction;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-3.7-flash",
       contents: [
         {
           inlineData: {
@@ -124,7 +142,7 @@ app.post("/api/ai/detect-orientation", async (req, res) => {
                      imageBase64.startsWith("data:image/png") ? "image/png" : "image/jpeg";
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-3.7-flash",
       contents: [
         {
           inlineData: {
@@ -142,6 +160,178 @@ app.post("/api/ai/detect-orientation", async (req, res) => {
   } catch (error: any) {
     console.error("Orientation Detect Exception:", error);
     res.json({ orientation: "NORMAL" }); // Fail gracefully
+  }
+});
+
+// 1. Specialized OCR for Egyptian National ID (New Clients)
+app.post("/api/ai/ocr-extract-id-card", async (req, res) => {
+  try {
+    const { imageBase64 } = req.body;
+    if (!imageBase64) {
+      return res.status(400).json({ error: "الرجاء توفير صورة بطاقة الرقم القومي" });
+    }
+    const mimeType = imageBase64.startsWith("data:application/pdf") ? "application/pdf" : 
+                     imageBase64.startsWith("data:image/png") ? "image/png" : "image/jpeg";
+
+    const prompt = `أنت نظام استخراج بيانات دقيق. قم بتحليل صورة بطاقة الرقم القومي المرفقة واستخرج البيانات التالية فقط: الاسم الكامل، الرقم القومي المكون من 14 رقماً، العنوان بالتفصيل، والمهنة. قم بإرجاع النتيجة حصراً بتنسيق JSON باستخدام المفاتيح التالية: name, national_id, address, profession. لا تضف أي نص تمهيدي أو ختامي.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.7-flash",
+      contents: [
+        {
+          inlineData: {
+            mimeType: mimeType,
+            data: imageBase64.replace(/^data:\w+\/[a-zA-Z0-9.+]+;base64,/, ""),
+          },
+        },
+        prompt
+      ],
+      config: {
+        systemInstruction: "You are an exact data extraction system for Egyptian National ID cards. Output only valid JSON with keys: name, national_id, address, profession.",
+        responseMimeType: "application/json"
+      }
+    });
+
+    let rawText = response.text || "{}";
+    let parsed: any = {};
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      const match = rawText.match(/\{[\s\S]*\}/);
+      if (match) parsed = JSON.parse(match[0]);
+    }
+
+    // Normalizing aliases so all client modules receive both snake_case and camelCase
+    const normalized = {
+      name: parsed.name || parsed.fullName || "",
+      national_id: parsed.national_id || parsed.nationalId || "",
+      address: parsed.address || "",
+      profession: parsed.profession || parsed.job || "",
+      fullName: parsed.name || parsed.fullName || "",
+      nationalId: parsed.national_id || parsed.nationalId || "",
+      job: parsed.profession || parsed.job || "",
+      rawText: rawText
+    };
+
+    res.json(normalized);
+  } catch (error: any) {
+    console.error("OCR ID Card Exception:", error);
+    res.status(500).json({ error: "فشل استخراج بيانات بطاقة الرقم القومي: " + error.message });
+  }
+});
+
+// 2. Specialized OCR for Contracts & Legal Memos (Archiving)
+app.post("/api/ai/ocr-contract-memo", async (req, res) => {
+  try {
+    const { imageBase64 } = req.body;
+    if (!imageBase64) {
+      return res.status(400).json({ error: "الرجاء توفير صورة العقد أو المستند القانوني" });
+    }
+    const mimeType = imageBase64.startsWith("data:application/pdf") ? "application/pdf" : 
+                     imageBase64.startsWith("data:image/png") ? "image/png" : "image/jpeg";
+
+    const prompt = `قم بقراءة هذا المستند القانوني واستخراج النص بالكامل بدقة عالية. حافظ على الهيكل العام للفقرات والترقيم كما هو موجود في الصورة الأصلية. تجاهل أي أختام، توقيعات، أو علامات مائية لا تشكل جزءاً من النص المقروء. إذا واجهت كلمة غير واضحة تماماً بسبب جودة المسح الضوئي، ضعها بين قوسين معقوفين [غير مقروء].`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.7-flash",
+      contents: [
+        {
+          inlineData: {
+            mimeType: mimeType,
+            data: imageBase64.replace(/^data:\w+\/[a-zA-Z0-9.+]+;base64,/, ""),
+          },
+        },
+        prompt
+      ],
+      config: {
+        systemInstruction: LAWYER_SYSTEM_INSTRUCTION
+      }
+    });
+
+    res.json({ text: response.text || "" });
+  } catch (error: any) {
+    console.error("OCR Contract Memo Exception:", error);
+    res.status(500).json({ error: "فشل قراءة العقد والمذكرة القانونية: " + error.message });
+  }
+});
+
+// 3. Specialized OCR for Judicial Session Minutes & Court Rulings (Case Automation)
+app.post("/api/ai/ocr-court-session-ruling", async (req, res) => {
+  try {
+    const { imageBase64 } = req.body;
+    if (!imageBase64) {
+      return res.status(400).json({ error: "الرجاء توفير صورة محضر الجلسة أو حكم المحكمة" });
+    }
+    const mimeType = imageBase64.startsWith("data:application/pdf") ? "application/pdf" : 
+                     imageBase64.startsWith("data:image/png") ? "image/png" : "image/jpeg";
+
+    const prompt = `حلل هذه الصورة المأخوذة من مستند قضائي (محضر جلسة أو حكم محكمة). استخرج البيانات الأساسية وضعها في قائمة واضحة تتضمن:
+
+رقم القضية وسنة التقييد.
+
+نوع القضية ودرجة المحكمة.
+
+المحكمة المختصة (مكان الانعقاد).
+
+أسماء أطراف النزاع.
+
+منطوق الحكم أو القرار الصادر في الجلسة (إن وجد).`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.7-flash",
+      contents: [
+        {
+          inlineData: {
+            mimeType: mimeType,
+            data: imageBase64.replace(/^data:\w+\/[a-zA-Z0-9.+]+;base64,/, ""),
+          },
+        },
+        prompt
+      ],
+      config: {
+        systemInstruction: LAWYER_SYSTEM_INSTRUCTION
+      }
+    });
+
+    res.json({ text: response.text || "" });
+  } catch (error: any) {
+    console.error("OCR Court Session Ruling Exception:", error);
+    res.status(500).json({ error: "فشل تحليل محضر الجلسة أو حكم المحكمة: " + error.message });
+  }
+});
+
+// 4. Specialized OCR for Handwritten Documents & Defense Drafts
+app.post("/api/ai/ocr-handwritten-draft", async (req, res) => {
+  try {
+    const { imageBase64 } = req.body;
+    if (!imageBase64) {
+      return res.status(400).json({ error: "الرجاء توفير صورة المسودة أو النص المكتوب بخط اليد" });
+    }
+    const mimeType = imageBase64.startsWith("data:application/pdf") ? "application/pdf" : 
+                     imageBase64.startsWith("data:image/png") ? "image/png" : "image/jpeg";
+
+    const prompt = `الصورة المرفقة تحتوي على نص مكتوب بخط اليد (مسودة دفاع أو ملاحظات قانونية). قم بنسخ النص المكتوب بدقة. في حال وجود أخطاء إملائية ناتجة عن سرعة الكتابة، قم بتصحيحها بناءً على السياق القانوني للجملة، مع كتابة الكلمة الأصلية كما بدت لك في ملاحظة صغيرة في نهاية النص. وضع أي كلمة غير مقروءة نهائياً بين قوسين معقوفين [غير مقروء].`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.7-flash",
+      contents: [
+        {
+          inlineData: {
+            mimeType: mimeType,
+            data: imageBase64.replace(/^data:\w+\/[a-zA-Z0-9.+]+;base64,/, ""),
+          },
+        },
+        prompt
+      ],
+      config: {
+        systemInstruction: LAWYER_SYSTEM_INSTRUCTION
+      }
+    });
+
+    res.json({ text: response.text || "" });
+  } catch (error: any) {
+    console.error("OCR Handwritten Draft Exception:", error);
+    res.status(500).json({ error: "فشل استخراج النصوص المكتوبة بخط اليد: " + error.message });
   }
 });
 
@@ -339,7 +529,7 @@ app.post("/api/ai/defense-brief", async (req, res) => {
 اكتب المذكرة بلغة عربية بليغة وصياغة قانونية محكمة جداً.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-3.7-flash",
       contents: prompt,
       config: {
         systemInstruction: LAWYER_SYSTEM_INSTRUCTION,
@@ -350,6 +540,80 @@ app.post("/api/ai/defense-brief", async (req, res) => {
   } catch (error: any) {
     console.error("Defense Brief Brief API error:", error);
     res.status(500).json({ error: "فشل صياغة مذكرة الدفاع: " + error.message });
+  }
+});
+
+// Advanced Legal Memo Analysis & Precedent-Grounded Redrafting API
+app.post("/api/ai/analyze-memo-draft", async (req, res) => {
+  try {
+    const { 
+      memoText, 
+      memoType = "مذكرة دفاع", 
+      courtLevel = "محكمة جنح مستأنف", 
+      clientRole = "المتهم / المستأنف", 
+      opponentRole = "المدعي بالحق المدني",
+      keyObjectives = ""
+    } = req.body;
+
+    if (!memoText || !memoText.trim()) {
+      return res.status(400).json({ error: "الرجاء توفير نص المذكرة المراد فحصها وتعديل صياغتها" });
+    }
+
+    const prompt = `أنت المحامي المصري الذكي (Egyptian Lawyer AI) والخبير الأول في الصياغة القضائية والدفوع بمكتب الأستاذ وسام الشناوي المحامي بالنقض والدستورية العليا.
+مهمتك: فحص وتحليل نص المذكرة المرفوعة أدناه بدقة متناهية، ثم تقديم تقرير نقد وتحليل للثغرات، واقتراح صياغة قانونية معدلة ومحكمة مدعمة بأحدث السوابق القضائية وأحكام محكمة النقض المصرية لعام 2026.
+
+معلومات السياق القضائي:
+- نوع المذكرة: ${memoType}
+- المحكمة المختصة: ${courtLevel}
+- صفة الموكل: ${clientRole}
+- صفة الخصم: ${opponentRole}
+- أهداف الدفاع الجوهرية: ${keyObjectives || "إثبات براءة الموكل / رفض ادعاءات الخصم / إرساء الدفاع الجوهري"}
+
+نص المذكرة المرفوعة الأصلي:
+---
+${memoText}
+---
+
+المطلوب إخراجه بدقة بالغة وفق الهيكل التالي:
+
+1. 🔍 **أولاً: تقرير الفحص القانوني للعيوب والثغرات (Flaw & Vulnerability Audit)**
+   - الثغرات الإجرائية والشكلية (مواعيد، اختصاص، إعلانات، صفات).
+   - الدفوع الجوهرية المفقودة التي كان يتعين على الدفاع إبداؤها جازمة قبل قفل باب المرافعة.
+   - عيوب التسبيب أو الصياغة الإنشائية أو الضعف في تسلسل الوقائع وربطها بالدليل.
+
+2. 📜 **ثانياً: اقتراح الصياغة القانونية المعدلة والمطورة (Enhanced Redrafted Memo)**
+   - اكتب نص المذكرة كاملاً بصياغة قضائية رصينة، بليغة، وجاهزة للتقديم للمحكمة فوراً.
+   - تشمل:
+     * الديباجة الرسمية (محكمة (...) الموقرة - الدائرة (...) - مذكرة بدفاع (...) ضد (...)).
+     * الوقائع بسبك قانوني منظم يبرز مركز الموكل.
+     * الدفوع الجوهرية مرتبة ومرقمة بدقة، مع ذكر نصوص مواد القانون المصري ذات الصلة.
+     * تفنيد مزاعم وأدلة الخصم بدقة.
+     * الطلبات الختامية الجازمة (أصلياً، واحتياطياً).
+     * تذييل رسمي: وكيل الموكل / وسام الشناوي المحامي بالنقض والدستورية العليا.
+
+3. 🏛️ **ثالثاً: السوابق القضائية وأحكام محكمة النقض والدستورية الواجبة الاستناد إليها (Judicial Precedents)**
+   - اذكر أرقام الطعون وسنواتها القضائية والدوائر (مثال: الطعن رقم ... لسنة ... ق - الدائرة الجنائية/المدنية/الأحوال الشخصية).
+   - نص المبدأ القانوني الثابت لكل حكم ومدى انطباقه الجازم على وقائع المذكرة لإلزام المحكمة بإيراده أو الرد عليه في أسباب حكمها.
+
+4. 🛡️ **رابعاً: التوصيات الإجرائية للمحامي في الجلسة**
+   - العبارات والطلبات التي يجب إثباتها صراحة في محضر الجلسة.
+   - المستندات والمذكرات الختامية المعززة.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.7-flash",
+      contents: prompt,
+      config: {
+        systemInstruction: LAWYER_SYSTEM_INSTRUCTION,
+      },
+    });
+
+    res.json({ 
+      analysis: response.text,
+      success: true 
+    });
+  } catch (error: any) {
+    console.error("Analyze Memo Draft API error:", error);
+    res.status(500).json({ error: "فشل تحليل وتعديل صياغة المذكرة: " + error.message });
   }
 });
 

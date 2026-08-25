@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { ClientProfile, CaseRecord, OpponentProfile } from "../types";
 import { INITIAL_COURTS } from "../utils/staticData";
+import PhoneInputWithCountry from "./PhoneInputWithCountry";
 import { 
   User, 
   Upload, 
@@ -134,6 +135,7 @@ export default function AddClientWizardModal({
   const [samePhoneForWhatsapp, setSamePhoneForWhatsapp] = useState(true);
   const [whatsappCountryCode, setWhatsappCountryCode] = useState("+20");
   const [whatsappPhone, setWhatsappPhone] = useState("");
+  const [facebookUrl, setFacebookUrl] = useState("");
 
   // Power of Attorney (التوكيل)
   const [poaNumber, setPoaNumber] = useState("");
@@ -237,8 +239,54 @@ export default function AddClientWizardModal({
   const [opponentName, setOpponentName] = useState("");
   const [caseFees, setCaseFees] = useState("15000");
 
+  // AI National ID OCR Extraction State
+  const [isOcrProcessing, setIsOcrProcessing] = useState(false);
+  const [ocrStatus, setOcrStatus] = useState<string | null>(null);
+
+  // Extract ID Card with AI
+  const handleExtractIdCardOcr = async (base64Img: string) => {
+    if (!base64Img) return;
+    setIsOcrProcessing(true);
+    setOcrStatus("جاري استخراج بيانات بطاقة الرقم القومي المصرية بدقة بالذكاء الاصطناعي...");
+    try {
+      const res = await fetch("/api/ai/ocr-extract-id-card", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64: base64Img })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // data contains name, national_id, address, profession
+        if (data.national_id || data.nationalId) {
+          setNationalId(data.national_id || data.nationalId);
+        }
+        if (data.name || data.fullName) {
+          const full = (data.name || data.fullName).trim();
+          const parts = full.split(/\s+/).filter(Boolean);
+          if (parts.length > 0) setFirstName(parts[0]);
+          if (parts.length > 1) setFatherName(parts[1]);
+          if (parts.length > 2) setGrandfatherName(parts[2]);
+          if (parts.length > 3) setFamilyName(parts.slice(3).join(" "));
+        }
+        if (data.address) {
+          setAddress(data.address);
+        }
+        setOcrStatus(`✔️ تم استخراج بيانات البطاقة بنجاح: ${data.name || ""} - الرقم القومي: ${data.national_id || ""}`);
+        setTimeout(() => setOcrStatus(null), 6000);
+      } else {
+        setOcrStatus("تعذر استخراج البيانات من الصورة. يرجى التأكد من وضوح بطاقة الرقم القومي.");
+        setTimeout(() => setOcrStatus(null), 4000);
+      }
+    } catch (err: any) {
+      setOcrStatus("حدث خطأ أثناء الاتصال بنظام الاستخراج: " + err.message);
+      setTimeout(() => setOcrStatus(null), 4000);
+    } finally {
+      setIsOcrProcessing(false);
+    }
+  };
+
   // File Upload Helper
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, setter: (b64: string) => void, isDualIdCard = false) => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, setter: (b64: string) => void, isDualIdCard = false, autoOcr = false) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
@@ -249,6 +297,9 @@ export default function AddClientWizardModal({
         if (isDualIdCard) {
           // If user checked "both sides in one image", set back side too
           setNationalIdScanBack(b64);
+        }
+        if (autoOcr) {
+          handleExtractIdCardOcr(b64);
         }
       }
     };
@@ -296,12 +347,12 @@ export default function AddClientWizardModal({
       countryCode,
       whatsappCountryCode: samePhoneForWhatsapp ? countryCode : whatsappCountryCode,
       whatsapp: effectiveWhatsapp,
+      facebook: facebook || facebookUrl || undefined,
       useSamePhoneForWhatsapp: samePhoneForWhatsapp,
       address: address || undefined,
       password: autoPassword,
       email: gmail || undefined,
-      facebook: facebook || undefined,
-      linkedin: linkedin || undefined,
+            linkedin: linkedin || undefined,
       gmail: gmail || undefined,
       connectedAccounts: {
         facebook: connectedFacebook,
@@ -497,6 +548,52 @@ export default function AddClientWizardModal({
                 </div>
               </div>
 
+              {/* OCR STATUS FEEDBACK */}
+              {ocrStatus && (
+                <div className={`p-3 rounded-xl text-xs font-black flex items-center gap-2 animate-in fade-in ${
+                  isOcrProcessing 
+                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30" 
+                    : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+                }`}>
+                  {isOcrProcessing ? (
+                    <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                  ) : (
+                    <ShieldCheck className="w-4 h-4 flex-shrink-0" />
+                  )}
+                  <span>{ocrStatus}</span>
+                </div>
+              )}
+
+              {/* QUICK OCR SCANNER CARD */}
+              <div className="bg-gradient-to-r from-amber-50 to-amber-100/60 dark:from-slate-900 dark:to-slate-800/80 p-3.5 rounded-2xl border border-amber-300 dark:border-amber-900/50 shadow-sm flex items-center justify-between flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-black flex-shrink-0 shadow-sm">
+                    <CreditCard className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                      <span>استخراج بيانات الموكل تلقائياً من بطاقة الرقم القومي (AI OCR)</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-200 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200 font-bold">14 رقماً بدقة</span>
+                    </h4>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">
+                      ارفع صورة وجه البطاقة لاستخراج الاسم رباعياً، الرقم القومي، العنوان، والمهنة فوراً
+                    </p>
+                  </div>
+                </div>
+
+                <label className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl cursor-pointer transition shadow-sm flex items-center gap-1.5 flex-shrink-0">
+                  <Sparkles className="w-4 h-4" />
+                  <span>{isOcrProcessing ? "جاري الاستخراج..." : "مسح بطاقة الرقم القومي"}</span>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    disabled={isOcrProcessing}
+                    onChange={(e) => handleFileUpload(e, setNationalIdScanFront, isBothSidesInOneImage, true)} 
+                  />
+                </label>
+              </div>
+
               {/* 4 SEPARATE NAME INPUTS */}
               <div className="bg-white/80 dark:bg-slate-900/60 p-4 rounded-2xl border border-[#c1d6b3] dark:border-slate-800 shadow-sm space-y-3">
                 <label className="block text-xs font-black text-[#223321] dark:text-[#d3e3d1]">
@@ -575,26 +672,13 @@ export default function AddClientWizardModal({
                   <label className="block text-xs font-black text-slate-800 dark:text-slate-200 mb-1.5">
                     3. رقم الهاتف المحمول (كود دولي + رقم) *
                   </label>
-                  <div className="flex gap-2">
-                    <select
-                      value={countryCode}
-                      onChange={(e) => setCountryCode(e.target.value)}
-                      className="w-28 p-2 rounded-xl text-xs bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-black"
-                    >
-                      {COUNTRY_CODES.map((c) => (
-                        <option key={c.code} value={c.code}>
-                          {c.flag} {c.code}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="010XXXXXXXX"
-                      className="flex-1 p-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-bold focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  <PhoneInputWithCountry
+                      value={countryCode + phone}
+                      onChange={(full, code, num) => {
+                        setCountryCode(code);
+                        setPhone(num);
+                      }}
                     />
-                  </div>
                 </div>
 
                 {/* WhatsApp Phone with disable/copy toggle */}
@@ -636,6 +720,18 @@ export default function AddClientWizardModal({
                       className="flex-1 p-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-bold focus:ring-2 focus:ring-amber-500 focus:outline-none"
                     />
                   </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    رابط حساب فيسبوك (اختياري)
+                  </label>
+                  <input
+                    type="url"
+                    value={facebookUrl}
+                    onChange={(e) => setFacebookUrl(e.target.value)}
+                    placeholder="https://facebook.com/..."
+                    className="w-full p-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-sans focus:ring-2 focus:ring-amber-500 focus:outline-none text-left dir-ltr"
+                  />
                 </div>
               </div>
 
@@ -862,15 +958,29 @@ export default function AddClientWizardModal({
                         </div>
                       )}
                     </div>
-                    <label className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl cursor-pointer transition shadow-sm">
-                      {nationalIdScanFront ? "تغيير وجه البطاقة" : "رفع وجه البطاقة"}
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        className="hidden" 
-                        onChange={(e) => handleFileUpload(e, setNationalIdScanFront, isBothSidesInOneImage)} 
-                      />
-                    </label>
+                    <div className="flex items-center gap-2 flex-wrap justify-center">
+                      <label className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl cursor-pointer transition shadow-sm">
+                        {nationalIdScanFront ? "تغيير وجه البطاقة" : "رفع وجه البطاقة"}
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          className="hidden" 
+                          onChange={(e) => handleFileUpload(e, setNationalIdScanFront, isBothSidesInOneImage, true)} 
+                        />
+                      </label>
+
+                      {nationalIdScanFront && (
+                        <button
+                          type="button"
+                          disabled={isOcrProcessing}
+                          onClick={() => handleExtractIdCardOcr(nationalIdScanFront)}
+                          className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-amber-400 font-black text-xs rounded-xl transition flex items-center gap-1 border border-amber-400/30"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                          <span>{isOcrProcessing ? "جاري المسح..." : "استخراج بالذكاء الاصطناعي"}</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Back Side */}

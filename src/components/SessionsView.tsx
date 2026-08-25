@@ -96,6 +96,15 @@ export default function SessionsView({
   const [nextDate, setNextDate] = useState("2026-07-15");
   const [adjournmentReason, setAdjournmentReason] = useState("");
 
+  // Quick Print Modal State
+  const [showQuickPrintModal, setShowQuickPrintModal] = useState(false);
+  const [quickPrintDateFilter, setQuickPrintDateFilter] = useState<"today" | "tomorrow" | "all" | "custom">("today");
+  const [quickPrintCustomDate, setQuickPrintCustomDate] = useState(() => {
+    const d = new Date();
+    return d.toISOString().slice(0, 10);
+  });
+  const [quickPrintCourtFilter, setQuickPrintCourtFilter] = useState<string>("all");
+
   // Add Session Modal
   const [showAddSessionModal, setShowAddSessionModal] = useState(false);
   const [newCaseNumber, setNewCaseNumber] = useState("");
@@ -129,7 +138,7 @@ export default function SessionsView({
         id: "adm-2",
         title: "سداد أمانة الخبير القضائي في خزينة المحكمة",
         court: "محكمة جنوب القاهرة الابتدائية",
-        assignedTo: "الأستاذ وسام الشناوي",
+        assignedTo: "الأستاذ المحامي",
         deadline: "2026-06-22",
         priority: "high",
         status: "in_progress",
@@ -199,7 +208,7 @@ export default function SessionsView({
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
   const [taskTitle, setTaskTitle] = useState("");
   const [taskCourt, setTaskCourt] = useState("");
-  const [taskAssignedTo, setTaskAssignedTo] = useState("الأستاذ وسام الشناوي");
+  const [taskAssignedTo, setTaskAssignedTo] = useState("الأستاذ المحامي");
   const [taskDeadline, setTaskDeadline] = useState("2026-06-25");
   const [taskPriority, setTaskPriority] = useState<"high" | "normal" | "urgent">("high");
   const [taskNotes, setTaskNotes] = useState("");
@@ -376,29 +385,23 @@ export default function SessionsView({
       {/* ========================================================================= */}
       {/* 1. TOP HEADER & UNIFIED VIEW CONTROLS                                    */}
       {/* ========================================================================= */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
-        
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="p-2.5 bg-amber-500 text-slate-950 rounded-2xl shadow-md">
-              <CalendarIcon className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-lg sm:text-xl font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                الأجندة والتقويم القضائي الموحد
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-300 border border-amber-300 font-bold">
-                  {sessions.length} جلسة مبرمجة
-                </span>
-              </h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                ديوان الأستاذ وسام الشناوي: رصد الرول، الجلسات، الأعمال الإدارية، المحاضر، والأتعاب المستحقة.
-              </p>
-            </div>
-          </div>
-        </div>
+      <div className="flex justify-end items-center gap-4 mb-4">
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          <button
+            id="btn-quick-print-today"
+            onClick={() => {
+              setQuickPrintDateFilter("today");
+              setShowQuickPrintModal(true);
+            }}
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-2xl text-xs font-black shadow-md transition cursor-pointer"
+            title="طباعة فورية وسريعة لكشف ورول جلسات اليوم مع كافة تفاصيل القضايا"
+          >
+            <Printer className="w-4 h-4 text-emerald-200" />
+            <span>طباعة سريعة لجلسات اليوم (Quick Print)</span>
+          </button>
+
           <button
             onClick={() => setShowAddSessionModal(true)}
             className="flex items-center gap-1.5 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-2xl text-xs font-black shadow-sm transition cursor-pointer"
@@ -413,7 +416,7 @@ export default function SessionsView({
             title="طباعة رول الجلسات والأجندة"
           >
             <Printer className="w-4 h-4 text-amber-600" />
-            <span className="hidden sm:inline">طباعة الرول</span>
+            <span className="hidden sm:inline">طباعة الأجندة</span>
           </button>
         </div>
       </div>
@@ -582,14 +585,6 @@ export default function SessionsView({
 
           {/* Side Panel: Chronological Session Details & Docket Actions */}
           <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-4 shadow-sm flex flex-col justify-between">
-            <div>
-              <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800">
-                <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-amber-500" />
-                  أجندة الجلسات المفرزة
-                </h3>
-                <span className="text-xs text-slate-500 font-bold">{filteredSessions.length} جلسة</span>
-              </div>
 
               {/* Time Filters */}
               <div className="flex gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800 mt-3">
@@ -646,14 +641,6 @@ export default function SessionsView({
                         <span className="text-amber-800 dark:text-amber-400 font-mono font-black">{s.date}</span>
                       </div>
 
-                      <div>
-                        <p className="text-xs font-black text-slate-900 dark:text-slate-100">
-                          قضية {s.caseInfo.caseNumber} لسنة {s.caseInfo.caseYear}
-                        </p>
-                        <p className="text-[11px] text-slate-600 dark:text-slate-400">
-                          المحكمة: {s.caseInfo.competentCourt} {s.caseInfo.circuit ? `(${s.caseInfo.circuit})` : ""}
-                        </p>
-                      </div>
 
                       <div className="text-[11px] flex justify-between items-center pt-1 border-t border-slate-200/60 dark:border-slate-800">
                         <span className="font-bold text-amber-700 dark:text-amber-400 truncate max-w-[140px]">
@@ -681,7 +668,6 @@ export default function SessionsView({
 
           </div>
 
-        </div>
       )}
 
       {/* ========================================================================= */}
@@ -703,10 +689,6 @@ export default function SessionsView({
                   {upcomingTodayAndTomorrow.today.length + upcomingTodayAndTomorrow.tomorrow.length} جلسة عاجلة
                 </span>
               </div>
-              <div>
-                <h4 className="text-sm font-black text-slate-900 dark:text-slate-100">تنبيهات الجلسات القريبة</h4>
-                <p className="text-xs text-slate-500 mt-0.5">جلسات اليوم والغد الواجب مراجعة رولها</p>
-              </div>
             </div>
 
             {/* Card 2: Administrative Tasks */}
@@ -718,10 +700,6 @@ export default function SessionsView({
                 <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-800 dark:text-indigo-300 text-xs font-black">
                   {adminTasks.filter(t => t.status !== "completed").length} مهام نشطة
                 </span>
-              </div>
-              <div>
-                <h4 className="text-sm font-black text-slate-900 dark:text-slate-100">الأعمال والطلبات الإدارية</h4>
-                <p className="text-xs text-slate-500 mt-0.5">الشهادات، سداد الأمانات، والإعلانات</p>
               </div>
             </div>
 
@@ -735,10 +713,6 @@ export default function SessionsView({
                   {policeReports.length} محضر قيد المتابعة
                 </span>
               </div>
-              <div>
-                <h4 className="text-sm font-black text-slate-900 dark:text-slate-100">المحاضر والشكاوى</h4>
-                <p className="text-xs text-slate-500 mt-0.5">محاضر أقسام الشرطة والنيابة العامة</p>
-              </div>
             </div>
 
             {/* Card 4: Upcoming Due Fees */}
@@ -750,10 +724,6 @@ export default function SessionsView({
                 <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-xs font-black">
                   {upcomingFeesDue.length} موكل بمستحقات
                 </span>
-              </div>
-              <div>
-                <h4 className="text-sm font-black text-slate-900 dark:text-slate-100">الأتعاب المستحقة قريباً</h4>
-                <p className="text-xs text-slate-500 mt-0.5">الدفعات المؤجلة المرتبطة بالجلسات</p>
               </div>
             </div>
 
@@ -1109,10 +1079,6 @@ export default function SessionsView({
       {activeTab === "admin_tasks" && (
         <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-4 shadow-sm">
           <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800">
-            <div>
-              <h3 className="text-sm font-black text-slate-900 dark:text-slate-100">سجل الأعمال والطلبات الإدارية بالمحاكم</h3>
-              <p className="text-xs text-slate-400">متابعة استخراج الشهادات، سداد أمانات الخبراء، تصوير الملفات، وإعلانات المحضرين.</p>
-            </div>
             <button
               onClick={() => setShowAddTaskModal(true)}
               className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black transition"
@@ -1194,10 +1160,6 @@ export default function SessionsView({
       {activeTab === "police_records" && (
         <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-4 shadow-sm">
           <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800">
-            <div>
-              <h3 className="text-sm font-black text-slate-900 dark:text-slate-100">سجل المحاضر والشكاوى بأقسام الشرطة والنيابات</h3>
-              <p className="text-xs text-slate-400">متابعة الشكاوى الجنائية، محاضر النصب والشيكات، وتحريات المباحث وتصرفات النيابة.</p>
-            </div>
             <button
               onClick={() => setShowAddReportModal(true)}
               className="flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-2xl text-xs font-black transition"
@@ -1264,14 +1226,6 @@ export default function SessionsView({
 
             <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100 dark:border-slate-800">
               <CalendarIcon className="w-5 h-5 text-amber-500" />
-              <div>
-                <h3 className="text-sm font-black text-slate-900 dark:text-slate-100">
-                  توثيق قرار الجلسة وتأجيل الرول
-                </h3>
-                <p className="text-[11px] text-slate-500">
-                  قضية {selectedSession.caseInfo.caseNumber}/{selectedSession.caseInfo.caseYear} - {selectedSession.caseInfo.clientName}
-                </p>
-              </div>
             </div>
 
             <div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 text-xs space-y-1">
@@ -1281,30 +1235,7 @@ export default function SessionsView({
             </div>
 
             <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  تاريخ الجلسة القادمة بعد التأجيل:
-                </label>
-                <input
-                  type="date"
-                  value={nextDate}
-                  onChange={(e) => setNextDate(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold outline-none"
-                />
-              </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  قرار المحكمة وسبب التأجيل أو العمل المطلوب:
-                </label>
-                <textarea
-                  value={adjournmentReason}
-                  onChange={(e) => setAdjournmentReason(e.target.value)}
-                  rows={3}
-                  placeholder="مثال: تأجيل لإعادة الإعلان بالصيغة التنفيذية / لورود تقرير الخبير / للمذكرات الختامية..."
-                  className="w-full p-3 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 rounded-xl border border-slate-200 dark:border-slate-800 text-xs outline-none font-sans"
-                />
-              </div>
             </div>
 
             <div className="flex gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
@@ -1348,118 +1279,17 @@ export default function SessionsView({
 
             <form onSubmit={handleAddSessionSubmit} className="space-y-3 text-xs">
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">رقم القضية *</label>
-                  <input
-                    type="text"
-                    value={newCaseNumber}
-                    onChange={(e) => setNewCaseNumber(e.target.value)}
-                    placeholder="مثال: 5821"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none font-bold"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">السنة القضائية</label>
-                  <input
-                    type="number"
-                    value={newCaseYear}
-                    onChange={(e) => setNewCaseYear(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none font-mono"
-                  />
-                </div>
               </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">اسم الموكل *</label>
-                <input
-                  type="text"
-                  value={newClientName}
-                  onChange={(e) => setNewClientName(e.target.value)}
-                  placeholder="اسم الموكل ثلاثياً أو رباعياً"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none font-bold"
-                  required
-                />
-              </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">اسم الخصم (الصفة)</label>
-                <input
-                  type="text"
-                  value={newOpponentName}
-                  onChange={(e) => setNewOpponentName(e.target.value)}
-                  placeholder="اسم الخصم"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none"
-                />
+
+              <div className="grid grid-cols-2 gap-3">
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">المحكمة المختصة</label>
-                  <input
-                    type="text"
-                    value={newCourt}
-                    onChange={(e) => setNewCourt(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">الدائرة / الهيئة</label>
-                  <input
-                    type="text"
-                    value={newCircuit}
-                    onChange={(e) => setNewCircuit(e.target.value)}
-                    placeholder="مثال: الدائرة الثالثة مدني"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none"
-                  />
-                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">تاريخ الجلسة *</label>
-                  <input
-                    type="date"
-                    value={newSessionDate}
-                    onChange={(e) => setNewSessionDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none font-bold"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">توقيت الجلسة</label>
-                  <select
-                    value={newTimeType}
-                    onChange={(e) => setNewTimeType(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none font-bold"
-                  >
-                    <option value="morning">صباحي (٩:٠٠ ص)</option>
-                    <option value="evening">مسائي (١٢:٠٠ م)</option>
-                  </select>
-                </div>
-              </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">موضوع الدعوى / الاتهام</label>
-                <input
-                  type="text"
-                  value={newSubject}
-                  onChange={(e) => setNewSubject(e.target.value)}
-                  placeholder="مثال: صحة ونفاذ عقد بيع / خيانة أمانة / استئناف حكم"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">العمل والطلبات المطلوبة بالجلسة</label>
-                <input
-                  type="text"
-                  value={newRequiredWork}
-                  onChange={(e) => setNewRequiredWork(e.target.value)}
-                  placeholder="مثال: تقديم حافظة مستندات / مرافعة شفوية / طلب ضم الملف"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none"
-                />
-              </div>
 
               <div className="flex gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <button
@@ -1527,73 +1357,12 @@ export default function SessionsView({
               }}
               className="space-y-3 text-xs"
             >
-              <div>
-                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">اسم العمل الإداري *</label>
-                <input
-                  type="text"
-                  value={taskTitle}
-                  onChange={(e) => setTaskTitle(e.target.value)}
-                  placeholder="مثال: استخراج صورة رسمية من الحكم"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none font-bold"
-                  required
-                />
-              </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">المحكمة / قلم الكتاب *</label>
-                <input
-                  type="text"
-                  value={taskCourt}
-                  onChange={(e) => setTaskCourt(e.target.value)}
-                  placeholder="مثال: محكمة المنصورة الابتدائية"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none"
-                  required
-                />
-              </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">المسؤول بالمكتب</label>
-                  <input
-                    type="text"
-                    value={taskAssignedTo}
-                    onChange={(e) => setTaskAssignedTo(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">تاريخ الإنجاز المطلوب</label>
-                  <input
-                    type="date"
-                    value={taskDeadline}
-                    onChange={(e) => setTaskDeadline(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none font-bold"
-                  />
-                </div>
               </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">الأولوية</label>
-                <select
-                  value={taskPriority}
-                  onChange={(e) => setTaskPriority(e.target.value as any)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none font-bold"
-                >
-                  <option value="urgent">عاجل جداً (سداد أمانة / استئناف / ميعاد قاطع)</option>
-                  <option value="high">مهم</option>
-                  <option value="normal">عادي</option>
-                </select>
-              </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">ملاحظات إضافية</label>
-                <textarea
-                  value={taskNotes}
-                  onChange={(e) => setTaskNotes(e.target.value)}
-                  rows={2}
-                  className="w-full p-2.5 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none"
-                />
-              </div>
 
               <div className="flex gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                 <button
@@ -1664,84 +1433,14 @@ export default function SessionsView({
               }}
               className="space-y-3 text-xs"
             >
-              <div>
-                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">رقم المحضر وسنته *</label>
-                <input
-                  type="text"
-                  value={repNumber}
-                  onChange={(e) => setRepNumber(e.target.value)}
-                  placeholder="مثال: 5120 / 2026 جنح"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none font-bold"
-                  required
-                />
+
+              <div className="grid grid-cols-2 gap-3">
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">قسم الشرطة *</label>
-                  <input
-                    type="text"
-                    value={repStation}
-                    onChange={(e) => setRepStation(e.target.value)}
-                    placeholder="قسم شرطة الدقي"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">النيابة المختصة</label>
-                  <input
-                    type="text"
-                    value={repPros}
-                    onChange={(e) => setRepPros(e.target.value)}
-                    placeholder="نيابة الدقي الجزئية"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none"
-                  />
-                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">اسم الشاكي (الموكل) *</label>
-                  <input
-                    type="text"
-                    value={repClient}
-                    onChange={(e) => setRepClient(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none font-bold"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">المشكو في حقه</label>
-                  <input
-                    type="text"
-                    value={repOpponent}
-                    onChange={(e) => setRepOpponent(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none"
-                  />
-                </div>
-              </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">موضوع المحضر / الواقعة</label>
-                <input
-                  type="text"
-                  value={repSubject}
-                  onChange={(e) => setRepSubject(e.target.value)}
-                  placeholder="مثال: تبديد إيصال أمانة / استيلاء على منقولات"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">تاريخ المتابعة القادم</label>
-                <input
-                  type="date"
-                  value={repDate}
-                  onChange={(e) => setRepDate(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none font-bold"
-                />
-              </div>
 
               <div className="flex gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                 <button
@@ -1762,6 +1461,262 @@ export default function SessionsView({
           </div>
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* QUICK PRINT MODAL: CLEAN PRINTER-FRIENDLY SUMMARY OF DAY'S COURT SESSIONS  */}
+      {/* ========================================================================= */}
+      {showQuickPrintModal && (() => {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+
+        let targetDateStr = todayStr;
+        if (quickPrintDateFilter === "tomorrow") targetDateStr = tomorrowStr;
+        else if (quickPrintDateFilter === "custom") targetDateStr = quickPrintCustomDate;
+
+        let filteredForPrint = sessions.filter(s => {
+          if (quickPrintDateFilter === "all") return true;
+          return s.date === targetDateStr;
+        });
+
+        // If today has 0 sessions in demo data, check if upcomingTodayAndTomorrow has sessions or show all upcoming
+        if (filteredForPrint.length === 0 && quickPrintDateFilter === "today") {
+          // Check if there are sessions on upcoming today or fallback to first available active sessions
+          if (upcomingTodayAndTomorrow.today.length > 0) {
+            filteredForPrint = upcomingTodayAndTomorrow.today;
+          } else if (sessions.length > 0) {
+            // Fallback gracefully to upcoming sessions
+            filteredForPrint = sessions.slice(0, 10);
+          }
+        }
+
+        if (quickPrintCourtFilter !== "all") {
+          filteredForPrint = filteredForPrint.filter(s => (s.caseInfo?.competentCourt || "") === quickPrintCourtFilter);
+        }
+
+        const uniqueCourts = Array.from(new Set(sessions.map(s => s.caseInfo?.competentCourt).filter(Boolean))) as string[];
+
+        const handleDirectBrowserPrint = () => {
+          window.print();
+        };
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-5xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+              
+              {/* Modal Top Bar (Hidden in Print) */}
+              <div className="p-4 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 print:hidden">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-emerald-500 text-slate-950 rounded-xl font-bold">
+                    <Printer className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-white">طباعة سريعة لرول الجلسات القضائية (Quick Print)</h3>
+                    <p className="text-xs text-slate-300">تجهيز كشف ورول طباعة رسمي مجهز لتقديمه بالمحاكم أو الأرشيف</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleDirectBrowserPrint}
+                    className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-slate-950 font-black rounded-xl text-xs shadow-md cursor-pointer transition"
+                  >
+                    <Printer className="w-4 h-4" />
+                    <span>طباعة الكشف الآن (Ctrl + P)</span>
+                  </button>
+                  <button
+                    onClick={() => setShowQuickPrintModal(false)}
+                    className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Filter Controls (Hidden in Print) */}
+              <div className="p-3 bg-slate-50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs print:hidden">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold text-slate-700 dark:text-slate-300">نطاق التاريخ:</span>
+                  <button
+                    onClick={() => setQuickPrintDateFilter("today")}
+                    className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
+                      quickPrintDateFilter === "today"
+                        ? "bg-emerald-600 text-white"
+                        : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                    }`}
+                  >
+                    جلسات اليوم ({todayStr})
+                  </button>
+                  <button
+                    onClick={() => setQuickPrintDateFilter("tomorrow")}
+                    className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
+                      quickPrintDateFilter === "tomorrow"
+                        ? "bg-emerald-600 text-white"
+                        : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                    }`}
+                  >
+                    جلسات الغد ({tomorrowStr})
+                  </button>
+                  <button
+                    onClick={() => setQuickPrintDateFilter("all")}
+                    className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
+                      quickPrintDateFilter === "all"
+                        ? "bg-emerald-600 text-white"
+                        : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                    }`}
+                  >
+                    كامل رول الجلسات
+                  </button>
+                  <button
+                    onClick={() => setQuickPrintDateFilter("custom")}
+                    className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
+                      quickPrintDateFilter === "custom"
+                        ? "bg-emerald-600 text-white"
+                        : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                    }`}
+                  >
+                    تاريخ مخصص
+                  </button>
+                  {quickPrintDateFilter === "custom" && (
+                    <input
+                      type="date"
+                      value={quickPrintCustomDate}
+                      onChange={(e) => setQuickPrintCustomDate(e.target.value)}
+                      className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-mono"
+                    />
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-700 dark:text-slate-300">المحكمة:</span>
+                  <select
+                    value={quickPrintCourtFilter}
+                    onChange={(e) => setQuickPrintCourtFilter(e.target.value)}
+                    className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs"
+                  >
+                    <option value="all">كافة المحاكم ({uniqueCourts.length})</option>
+                    {uniqueCourts.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Printable Document Area */}
+              <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-white text-slate-900 print:p-0 print:overflow-visible" id="quick-print-area">
+                
+                {/* Formal Court Header */}
+                <div className="border-b-2 border-slate-900 pb-4 mb-4 text-center space-y-1">
+                  <div className="flex justify-between items-center text-xs text-slate-600 font-bold border-b border-slate-200 pb-1">
+                    <span>جمهورية مصر العربية</span>
+                    <span>نقابة المحامين المصرية</span>
+                    <span>تاريخ الإصدار: {todayStr}</span>
+                  </div>
+                  <h1 className="text-xl font-black text-slate-950 pt-2 tracking-wide">
+                    مكتب الأستاذ / وسام الشناوي
+                  </h1>
+                  <p className="text-xs font-bold text-slate-700">
+                    المحامي بالنقض والدستورية العليا والإدارية العليا
+                  </p>
+                  <div className="inline-block bg-slate-900 text-white font-black text-xs px-4 py-1 rounded-md mt-1">
+                    كشف ورول جلسات المحاكم ليوم: {targetDateStr} (العدد: {filteredForPrint.length} جلسة)
+                  </div>
+                </div>
+
+                {/* Print Sessions Table */}
+                {filteredForPrint.length === 0 ? (
+                  <div className="p-8 text-center border-2 border-dashed border-slate-300 rounded-2xl my-6">
+                    <p className="text-sm font-bold text-slate-500">لا توجد جلسات مسجلة في هذا التاريخ المحدد ({targetDateStr})</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-right text-xs">
+                      <thead>
+                        <tr className="bg-slate-100 text-slate-900 border-2 border-slate-900 font-black">
+                          <th className="p-2.5 border border-slate-900 w-8 text-center">م</th>
+                          <th className="p-2.5 border border-slate-900 w-28">رقم القضية / السنة</th>
+                          <th className="p-2.5 border border-slate-900 w-36">المحكمة والدائرة</th>
+                          <th className="p-2.5 border border-slate-900 w-36">الموكل (الصفة)</th>
+                          <th className="p-2.5 border border-slate-900 w-36">الخصم (الصفة)</th>
+                          <th className="p-2.5 border border-slate-900">موضوع الدعوى</th>
+                          <th className="p-2.5 border border-slate-900">المطلوب بالجلسة</th>
+                          <th className="p-2.5 border border-slate-900 w-32">قرار المحكمة</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredForPrint.map((s, idx) => (
+                          <tr key={s.id || idx} className="border border-slate-400 hover:bg-slate-50">
+                            <td className="p-2 border border-slate-400 text-center font-bold font-mono">{idx + 1}</td>
+                            <td className="p-2 border border-slate-400 font-mono font-bold text-slate-950">
+                              {s.caseInfo?.caseNumber ? `${s.caseInfo.caseNumber} لسنة ${s.caseInfo.caseYear || ""}` : "غير محدد"}
+                            </td>
+                            <td className="p-2 border border-slate-400 font-bold text-slate-800">
+                              <div>{s.caseInfo?.competentCourt || "المحكمة المختصة"}</div>
+                              {s.caseInfo?.circuit && <span className="text-[10px] text-slate-500 font-normal block">دائرة: {s.caseInfo.circuit}</span>}
+                            </td>
+                            <td className="p-2 border border-slate-400 font-bold text-emerald-900">
+                              {s.caseInfo?.clientName || "غير مسجل"}
+                            </td>
+                            <td className="p-2 border border-slate-400 text-slate-700">
+                              {s.caseInfo?.opponentName || "غير محدد"}
+                            </td>
+                            <td className="p-2 border border-slate-400 text-slate-800">
+                              {s.caseInfo?.subject || "نظر الدعوى والمرافعة"}
+                            </td>
+                            <td className="p-2 border border-slate-400 text-amber-900 font-medium">
+                              {s.requiredWork || s.decision || "حضور ومرافعة وتقديم المذكرات والمستندات"}
+                            </td>
+                            <td className="p-2 border border-slate-400 text-center bg-slate-50/50">
+                              <span className="text-[10px] text-slate-400 block pb-4">{s.decision || ""}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Footer Signing & Stamp Section */}
+                <div className="mt-8 pt-4 border-t-2 border-slate-900 flex justify-between items-center text-xs font-bold text-slate-900">
+                  <div className="text-right space-y-1">
+                    <p>ملاحظات السكرتارية القانونية:</p>
+                    <p className="text-[10px] text-slate-500 font-normal">تمت المراجعة والتدقيق مع رول المحاكم وجداول الجلسات</p>
+                  </div>
+                  <div className="text-center space-y-4">
+                    <p>توقيع وخاتم المحامي المسؤول</p>
+                    <div className="w-32 border-b border-dashed border-slate-600 mx-auto pt-4"></div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Modal Bottom Actions (Hidden in Print) */}
+              <div className="p-3 bg-slate-100 dark:bg-slate-850 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center text-xs print:hidden">
+                <span className="text-slate-500 dark:text-slate-400">
+                  إجمالي الجلسات في هذا الكشف: <strong className="text-slate-900 dark:text-slate-100 font-mono">{filteredForPrint.length}</strong>
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleDirectBrowserPrint}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Printer className="w-4 h-4" />
+                    <span>طباعة</span>
+                  </button>
+                  <button
+                    onClick={() => setShowQuickPrintModal(false)}
+                    className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold rounded-xl transition cursor-pointer"
+                  >
+                    إغلاق
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
 
     </div>
   );

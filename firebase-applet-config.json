@@ -1,12 +1,12 @@
 {
-  "projectId": "wesam-ai",
-  "appId": "1:750991006584:web:458c35ec52b7eea0d7468d",
-  "apiKey": "AIzaSyAyndyvTnsvkuISV-piI24hsWORcov19zY",
-  "authDomain": "wesam-ai.firebaseapp.com",
+  "projectId": "l-w-e-lawfirm-portal",
+  "appId": "1:871947875083:web:7643e3ea74a538cd42680e",
+  "apiKey": "AIzaSyApPLJVnWGbYlvWJ78CGr0jtMhV4smusCw",
+  "authDomain": "l-w-e-lawfirm-portal.firebaseapp.com",
   "firestoreDatabaseId": "ai-studio-0a63d531-657c-4547-a5c7-3ad30a55d266",
-  "storageBucket": "wesam-ai.firebasestorage.app",
-  "messagingSenderId": "750991006584",
+  "storageBucket": "l-w-e-lawfirm-portal.firebasestorage.app",
+  "messagingSenderId": "871947875083",
   "measurementId": "",
-  "oAuthClientId": "750991006584-ou0p80k4m33bg3ac22u971nvdl5k9ugg.apps.googleusercontent.com",
+  "oAuthClientId": "871947875083-obsdnnt7bq72ruam8hc3o64lledaipeu.apps.googleusercontent.com",
   "recaptchaSiteKey": ""
 }

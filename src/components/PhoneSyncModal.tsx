@@ -464,7 +464,7 @@ export default function PhoneSyncModal({
         {/* Footer */}
         <div className="p-4 bg-slate-50 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center text-xs">
           <p className="text-slate-500 text-[11px]">
-            دليل الهواتف الدولي للمكتب الذكي • الأستاذ وسام الشناوي المحامي
+            دليل الهواتف الدولي للمكتب الذكي • الأستاذ المحامي المحامي
           </p>
           <button
             type="button"

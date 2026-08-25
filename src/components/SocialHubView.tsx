@@ -58,7 +58,7 @@ export default function SocialHubView({ language, currentUser, clients, onUpdate
       {
         sender: "office",
         text: language === "ar" 
-          ? "مرحباً بك في المحادثة المباشرة الموثقة مع ديوان الأستاذ وسام الشناوي. هنا يمكنك كتابة الاستفسارات، وسيتم الاستجابة من السكرتارية القانونية المعينة لقضيتك!"
+          ? "مرحباً بك في المحادثة المباشرة الموثقة مع ديوان الأستاذ المحامي. هنا يمكنك كتابة الاستفسارات، وسيتم الاستجابة من السكرتارية القانونية المعينة لقضيتك!"
           : "Welcome to your secure chat line with Advocate Wesam Al-Shenawey's legal staff. Post your inquiries, and the appointed legal clerks will assist you.",
         time: new Date().toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })
       }
@@ -115,7 +115,7 @@ export default function SocialHubView({ language, currentUser, clients, onUpdate
         } else if (typed.includes("توكيل") || typed.includes("رقم")) {
           responseText = "توثيق توكيلك محرز بملف الأمان لدينا بالخارج بوزارة العدل. لا تقلق، كافة الدفاعات معتمدة.";
         } else {
-          responseText = "نشكرك على رسالتك. تلقى الأستاذ وسام الشناوي والسكرتارية القانونية ملحوظتك، وسيتم اتخاذ الإجراء اللازم في جلسة المراجعة اليومية.";
+          responseText = "نشكرك على رسالتك. تلقى الأستاذ المحامي والسكرتارية القانونية ملحوظتك، وسيتم اتخاذ الإجراء اللازم في جلسة المراجعة اليومية.";
         }
       } else {
         responseText = "Advocate Wesam and the staff received your input. We will verify your case folder and get back to you shortly.";
@@ -202,7 +202,7 @@ export default function SocialHubView({ language, currentUser, clients, onUpdate
     {
       id: "phone",
       title: t("direct_call"),
-      desc: language === "ar" ? "الاتصال الهاتفي المباشر بالأستاذ وسام الشناوي" : "Place a direct voice call to Advocate Wesam Al-Shenawey.",
+      desc: language === "ar" ? "الاتصال الهاتفي المباشر بالأستاذ المحامي" : "Place a direct voice call to Advocate Wesam Al-Shenawey.",
       color: "bg-amber-50 text-amber-950 border-amber-300 hover:bg-amber-100 dark:bg-amber-950/20 dark:text-amber-300 dark:border-amber-800",
       icon: <PhoneCall className="w-5 h-5 text-amber-600 dark:text-amber-400" />,
       link: "tel:+201283233555",
@@ -223,17 +223,14 @@ export default function SocialHubView({ language, currentUser, clients, onUpdate
     <div className="space-y-8 text-right font-sans" dir={language === "ar" ? "rtl" : "ltr"}>
       
       {/* Title block */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition duration-300 dark:bg-slate-900 dark:border-slate-800">
-        <div className="space-y-1">
-          <h2 className="text-xl font-extrabold text-slate-900 dark:text-amber-500 flex items-center gap-2 justify-start">
-            <FolderLock className="w-6 h-6 text-amber-500 animate-pulse" />
+      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-wrap justify-between items-center gap-4">
+        <div className="flex items-center gap-2.5">
+          <span className="p-2 bg-amber-500/10 rounded-xl text-amber-500">
+            <FolderLock className="w-5 h-5" />
+          </span>
+          <h2 className="text-base md:text-lg font-black text-slate-900 dark:text-white">
             {language === "ar" ? "الملف الشخصي وخزنة المستندات المحمية" : "Private Profile & Secure Locker"}
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-2xl leading-relaxed">
-            {language === "ar"
-              ? "محيط اتصال مخصص للموكلين للإشراف وتصفح أوراق القضايا والتوكيلات المكبسلة لضمان السرية التامة."
-              : "A secure digital environment strictly designated for corporate clients and administrators to review records and files."}
-          </p>
         </div>
 
         <div className="flex items-center gap-2 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl dark:bg-amber-950/20 dark:border-amber-800 dark:text-amber-400">
@@ -525,7 +522,7 @@ export default function SocialHubView({ language, currentUser, clients, onUpdate
           <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2 flex-wrap gap-2">
             <div className="flex items-center gap-1.5 justify-start">
               <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping"></span>
-              <span className="text-xs font-black text-slate-900 dark:text-white">المكتب الرئيسي للأستاذ وسام الشناوي (نشط الآن)</span>
+              <span className="text-xs font-black text-slate-900 dark:text-white">المكتب الرئيسي للأستاذ المحامي (نشط الآن)</span>
             </div>
             <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-850 rounded text-[9px] text-slate-500 font-mono">2026-06-08</span>
           </div>
@@ -578,7 +575,7 @@ export default function SocialHubView({ language, currentUser, clients, onUpdate
               <div className="relative mx-auto w-24 h-24 rounded-full overflow-hidden border-4 border-amber-500 animate-pulse bg-slate-850 flex items-center justify-center">
                 <span className="text-3xl font-extrabold text-amber-500">⚖️</span>
               </div>
-              <h3 className="text-lg font-black text-amber-500">مكتب المستشار وسام الشناوي</h3>
+              <h3 className="text-lg font-black text-amber-500">مكتب المستشار المحامي</h3>
               <p className="text-[10px] text-slate-400 uppercase tracking-wide">
                 {activeCall === "video" ? "اتصال مرئي مشفر HD" : "اتصال صوتي عالي النقاء والأمان"}
               </p>

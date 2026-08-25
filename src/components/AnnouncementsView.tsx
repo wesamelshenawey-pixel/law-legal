@@ -112,21 +112,13 @@ export default function AnnouncementsView({
   return (
     <div className="space-y-6 font-sans text-right" dir={language === "ar" ? "rtl" : "ltr"}>
       
-      {/* Top Banner Box with Tonal Olive Styling */}
-      <div className="bg-gradient-to-l from-red-600 via-amber-600 to-red-700 text-white p-6 rounded-2xl shadow-lg border border-red-400 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
-              <Megaphone className="w-6 h-6 text-amber-300" />
-            </span>
-            <span className="text-xs font-black text-amber-200 bg-black/30 px-3 py-1 rounded-full uppercase tracking-wider">
-              المركز الإعلامي واللوحة العامة
-            </span>
-          </div>
-          <h2 className="text-xl md:text-2xl font-black">ديوان الإعلانات والتعميمات القضائية</h2>
-          <p className="text-xs md:text-sm text-amber-100 mt-1 max-w-2xl">
-            منظومة البث الإعلاني المباشر لكافة الموكلين، والمحامين، والزوار. تنبيهات عاجلة بقرارات المحاكم ومواعيد العمل والبيانات الرسمية.
-          </p>
+      {/* Top Header Toolbar with Extracted Buttons */}
+      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-2.5">
+          <span className="p-2 bg-amber-500/10 rounded-xl text-amber-500">
+            <Megaphone className="w-5 h-5" />
+          </span>
+          <h2 className="text-base md:text-lg font-black text-slate-900 dark:text-white">ديوان الإعلانات والتعميمات القضائية</h2>
         </div>
 
         <div className="flex items-center gap-2">
@@ -135,9 +127,9 @@ export default function AnnouncementsView({
               id="add-announcement-btn"
               type="button"
               onClick={() => setShowAddModal(true)}
-              className="px-4 py-2.5 bg-white hover:bg-amber-100 text-slate-900 font-black text-xs rounded-xl shadow-md flex items-center gap-2 cursor-pointer transition"
+              className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl shadow-sm flex items-center gap-2 cursor-pointer transition"
             >
-              <Plus className="w-4 h-4 text-red-600" />
+              <Plus className="w-4 h-4 text-slate-950" />
               <span>إدراج إعلان / تعميم جديد</span>
             </button>
           )}
@@ -145,9 +137,9 @@ export default function AnnouncementsView({
           <button
             type="button"
             onClick={() => window.print()}
-            className="px-3.5 py-2.5 bg-black/30 hover:bg-black/40 text-white font-bold text-xs rounded-xl border border-white/20 flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs rounded-xl border border-slate-300 dark:border-slate-700 flex items-center gap-1.5 cursor-pointer"
           >
-            <Printer className="w-4 h-4" />
+            <Printer className="w-4 h-4 text-amber-500" />
             <span>طباعة اللائحة</span>
           </button>
         </div>

@@ -58,9 +58,9 @@ export default function FacebookSessionImporter({
       imageUrl: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=1200&q=80",
       rollLines: [
         "1. رول رقم 1 - جنحة 1024 لسنة 2026 - تهمة تبديد - قرار: حجز للحكم لآخر الجلسة",
-        "2. رول رقم 4 - جنحة 3420 لسنة 2026 - الأستاذ وسام الشناوي عن المتهم - قرار: التأجيل لتقديم المذكرات وسداد الأمانة",
+        "2. رول رقم 4 - جنحة 3420 لسنة 2026 - الأستاذ المحامي عن المتهم - قرار: التأجيل لتقديم المذكرات وسداد الأمانة",
         "3. رول رقم 8 - جنحة 5120 لسنة 2026 - إيصال أمانة - قرار: ندب خبير أبحاث التزييف والتزوير",
-        "4. رول رقم 12 - جنحة 6033 لسنة 2026 - الأستاذ وسام الشناوي بالنقض - قرار: البراءة ورفض الدعوى المدنية",
+        "4. رول رقم 12 - جنحة 6033 لسنة 2026 - الأستاذ المحامي بالنقض - قرار: البراءة ورفض الدعوى المدنية",
         "5. رول رقم 15 - جنحة 7810 لسنة 2026 - سرقة تيار - قرار: التصالح وانقضاء الدعوى الجنائية",
         "6. رول رقم 19 - جنحة 9012 لسنة 2026 - شيك بدون رصيد - قرار: تأجيل لإعلان الخصم"
       ]
@@ -76,7 +76,7 @@ export default function FacebookSessionImporter({
       imageUrl: "https://images.unsplash.com/photo-1450133064473-71024230f91b?auto=format&fit=crop&w=1200&q=80",
       rollLines: [
         "1. رول رقم 3 - استئناف 215 لسنة 2026 مدني - قرار: إحالة لمكتب الخبراء لفرز وتجنيب التركة",
-        "2. رول رقم 7 - استئناف 440 لسنة 2026 - مكتب الأستاذ وسام الشناوي - قرار: إلغاء الحكم المستأنف والقضاء بصحة ونفاذ العقد",
+        "2. رول رقم 7 - استئناف 440 لسنة 2026 - مكتب الأستاذ المحامي - قرار: إلغاء الحكم المستأنف والقضاء بصحة ونفاذ العقد",
         "3. رول رقم 11 - استئناف 890 لسنة 2026 - تعويضات - قرار: شطب الدعوى لغياب الطرفين",
         "4. رول رقم 14 - استئناف 1120 لسنة 2026 - إخلاء لعدم سداد الأجرة - قرار: التأجيل للمستندات"
       ]
@@ -84,7 +84,7 @@ export default function FacebookSessionImporter({
   ]);
 
   const [selectedPost, setSelectedPost] = useState<FacebookCourtPost>(feedPosts[0]);
-  const [searchHighlightTerm, setSearchHighlightTerm] = useState<string>("وسام الشناوي");
+  const [searchHighlightTerm, setSearchHighlightTerm] = useState<string>("المحامي");
   const [hideNonMatching, setHideNonMatching] = useState<boolean>(true);
   const [uploadedCustomImage, setUploadedCustomImage] = useState<string | null>(null);
   const [customImageLines, setCustomImageLines] = useState<string[]>([]);
@@ -110,9 +110,9 @@ export default function FacebookSessionImporter({
       setUploadedCustomImage(dataUrl);
       setCustomImageLines([
         "1. كشف جلسة مستورد من فيسبوك - رول رقم 1 - قضية 1102 لسنة 2026",
-        "2. رول رقم 5 - جنحة 2210 لسنة 2026 - الأستاذ وسام الشناوي عن المتهم - تأجيل للتقرير",
+        "2. رول رقم 5 - جنحة 2210 لسنة 2026 - الأستاذ المحامي عن المتهم - تأجيل للتقرير",
         "3. رول رقم 9 - قضية 3340 لسنة 2026 - مدني كلي الزقازيق",
-        "4. رول رقم 14 - جنحة 4450 لسنة 2026 - الأستاذ وسام الشناوي - براءة حضورياً",
+        "4. رول رقم 14 - جنحة 4450 لسنة 2026 - الأستاذ المحامي - براءة حضورياً",
         "5. رول رقم 18 - جنحة 5560 لسنة 2026 - تأجيل للصلح"
       ]);
     };
@@ -192,7 +192,7 @@ export default function FacebookSessionImporter({
               type="text"
               value={searchHighlightTerm}
               onChange={(e) => setSearchHighlightTerm(e.target.value)}
-              placeholder="اكتب كلمة أو اسم الموكل أو المحامي أو رقم الرول للتمييز الفوري (مثال: وسام الشناوي)..."
+              placeholder="اكتب كلمة أو اسم الموكل أو المحامي أو رقم الرول للتمييز الفوري (مثال: المحامي)..."
               className="w-full pl-3 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs text-right outline-none focus:ring-2 focus:ring-amber-500 font-bold"
             />
           </div>

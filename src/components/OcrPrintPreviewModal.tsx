@@ -37,7 +37,7 @@ export default function OcrPrintPreviewModal({
   };
 
   const handleDownloadDoc = () => {
-    const header = `جمهورية مصر العربية\nمكتب الأستاذ / وسام الشناوي\nالمحامي بالاستئناف العالي ومجلس الدولة\n---------------------------------------\n${documentTitle}\nالقضية رقم: ${caseNumber || "..."} لسنة ${caseYear || "2026"} - ${courtName || "..."}\nالموكل: ${clientName || "..."}\nالخصم: ${opponentName || "..."}\n---------------------------------------\n\n`;
+    const header = `جمهورية مصر العربية\nمكتب الأستاذ / المحامي\nالمحامي بالاستئناف العالي ومجلس الدولة\n---------------------------------------\n${documentTitle}\nالقضية رقم: ${caseNumber || "..."} لسنة ${caseYear || "2026"} - ${courtName || "..."}\nالموكل: ${clientName || "..."}\nالخصم: ${opponentName || "..."}\n---------------------------------------\n\n`;
     const fullContent = header + text;
     const blob = new Blob([fullContent], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -110,7 +110,7 @@ export default function OcrPrintPreviewModal({
               <div className="space-y-1">
                 <p className="text-xs font-bold text-slate-700">جمهورية مصر العربية</p>
                 <h2 className="text-lg font-black tracking-tight text-slate-950">
-                  مكتب الأستاذ / وسام الشناوي
+                  مكتب الأستاذ / المحامي
                 </h2>
                 <p className="text-xs font-bold text-slate-700">
                   المحامي بالنقض والدستورية العليا ومجلس الدولة
@@ -168,9 +168,9 @@ export default function OcrPrintPreviewModal({
               </div>
 
               <div className="text-center space-y-3">
-                <p className="font-bold text-slate-800">وكيل الموكل / المستشار القانوني</p>
+                <p className="font-bold text-slate-800">وكيل صاحب الشأن بحسب صفته القضائية / المستشار القانوني</p>
                 <div className="pt-4 font-black text-sm text-slate-950 font-serif">
-                  وسام الشناوي (المحامي)
+                  المحامي (المحامي)
                 </div>
                 <div className="text-[10px] text-slate-500 font-mono">
                   حرر في: {new Date().toLocaleDateString("ar-EG")}

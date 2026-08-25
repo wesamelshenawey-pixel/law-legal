@@ -21,20 +21,27 @@ import {
   Sparkles, 
   FileText, 
   Eye, 
-  Scan,
-  Filter,
-  Calendar,
-  Building2,
-  Clock,
-  RotateCcw,
-  Mail,
-  Send,
-  CheckCircle2,
-  X,
-  AlertCircle
+  Scan, 
+  Filter, 
+  Calendar, 
+  Building2, 
+  Clock, 
+  RotateCcw, 
+  Mail, 
+  Send, 
+  CheckCircle2, 
+  X, 
+  AlertCircle,
+  Bookmark,
+  Layers,
+  Flag,
+  Share2
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { dbSaveEmailNotification } from "../utils/firebaseSync";
+import { getClientRoleLabel } from "../utils/translations";
+import CaseTimeline from "./CaseTimeline";
+import { saveLocalKeepMemo, GoogleKeepNote } from "../utils/workspaceService";
 
 interface CasesViewProps {
   cases: CaseRecord[];
@@ -47,6 +54,7 @@ interface CasesViewProps {
   courtsList: string[];
   subjectsList: string[];
   onUpdateCase?: (id: string, updatedFields: Partial<CaseRecord>) => void;
+  onDeleteCase?: (id: string) => void;
   currentUser: PlatformUser;
   language: "ar" | "en";
   defaultSelectCaseId?: string | null;
@@ -153,6 +161,7 @@ export default function CasesView({
   courtsList,
   subjectsList,
   onUpdateCase,
+  onDeleteCase,
   currentUser,
   language,
   defaultSelectCaseId,
@@ -161,6 +170,7 @@ export default function CasesView({
   onNavigateToOcr
 }: CasesViewProps) {
   const [showAddForm, setShowAddForm] = useState(false);
+  const [selectedCaseIds, setSelectedCaseIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCase, setSelectedCase] = useState<CaseRecord | null>(null);
 
@@ -288,6 +298,26 @@ export default function CasesView({
   const [isScanning, setIsScanning] = useState(false);
   const [scannedTempPages, setScannedTempPages] = useState<{ id: string; name: string; url: string; pageNum: number }[]>([]);
 
+  // Selected Case Drawer Tab State
+  const [drawerActiveTab, setDrawerActiveTab] = useState<"details" | "timeline" | "keep">("details");
+  const [keepExportSuccess, setKeepExportSuccess] = useState<string | null>(null);
+
+  const handleExportCaseToKeep = (c: CaseRecord) => {
+    const keepNote: GoogleKeepNote = {
+      id: `keep-case-${c.id}-${Date.now()}`,
+      title: `قضية رقم ${c.caseNumber} لسنة ${c.caseYear} - ${c.competentCourt}`,
+      content: `• الموكل: ${c.clientName} (${c.clientRole})\n• الخصم: ${c.opponentName}\n• الموضوع: ${c.subject}\n• الجلسة القادمة: ${c.nextSessionDate}\n\nملخص الواقعة:\n${c.details || "لا توجد تفاصيل إضافية"}`,
+      tags: ["ملف قضية", "قضايا"],
+      caseNumber: c.caseNumber,
+      clientName: c.clientName,
+      createdAt: new Date().toISOString(),
+      color: "amber"
+    };
+    saveLocalKeepMemo(keepNote);
+    setKeepExportSuccess(c.id);
+    setTimeout(() => setKeepExportSuccess(null), 3000);
+  };
+
   // Clean up camera on close
   useEffect(() => {
     return () => {
@@ -369,7 +399,7 @@ export default function CasesView({
         // Add stamp/watermark on the captured image for premium judicial look
         ctx.fillStyle = "rgba(217, 119, 6, 0.4)";
         ctx.font = "bold 24px sans-serif";
-        ctx.fillText("مكتب وسام الشناوي المحامي ⚖️", 50, canvas.height - 50);
+        ctx.fillText("مكتب المحامي المحامي ⚖️", 50, canvas.height - 50);
 
         const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
         setCapturedBase64(dataUrl);
@@ -452,7 +482,7 @@ export default function CasesView({
     ctx.fillText("جمهورية مصر العربية", canvas.width / 2, 80);
     ctx.font = "bold 16px sans-serif";
     ctx.fillText("وزارة العدل - مصلحة المحاكم الشهرية", canvas.width / 2, 110);
-    ctx.fillText("مكتب الأستاذ وسام الشناوي - المحامي بالنقض والإدارية العليا", canvas.width / 2, 140);
+    ctx.fillText("مكتب الأستاذ المحامي - المحامي بالنقض والإدارية العليا", canvas.width / 2, 140);
 
     ctx.strokeStyle = "#cbd5e1";
     ctx.beginPath();
@@ -477,7 +507,7 @@ export default function CasesView({
     const pageTextBlocks: { [key: number]: string[] } = {
       1: [
         "بناءً على طلب الموكل المذكور أعلاه والمقيد بجدول المحامين المعتمدين بوزارة العدل،",
-        "أنا وسام الشناوي المحامي، أقرر تقديم هذا المستند كدليل رسمي ثابت بوقائع الدعوى والمطالبة.",
+        "أنا المحامي المحامي، أقرر تقديم هذا المستند كدليل رسمي ثابت بوقائع الدعوى والمطالبة.",
         "حيث تبيّن عدم الالتزام ببنود التعاقد والمماطلة في تسوية النزاع الودي المبرم بمسودة الاتفاق،",
         "لذلك نلتمس القضاء بإلزام الطرف المدعى عليه بقيمة التعويضات المادية والأدبية والخبرة القضائية."
       ],
@@ -498,7 +528,7 @@ export default function CasesView({
     const paragraphs = pageTextBlocks[pageNumber] || [
       `مستند قضائي ممسوح ومؤرشف - الورقة الملحقة رقم ${pageNumber}`,
       "تم التقاط وسحب المستند ضوئياً بواسطة السكانر المتصل LAN/USB بنجاح تام.",
-      "مكتب وسام الشناوي لتكنولوجيا المحاماة المؤرشفة سحابياً بنظام الأمان والخصوصية.",
+      "مكتب المحامي لتكنولوجيا المحاماة المؤرشفة سحابياً بنظام الأمان والخصوصية.",
       "مؤمن ومصدق رقمياً لعام ٢٠٢٦ م."
     ];
 
@@ -525,7 +555,7 @@ export default function CasesView({
     ctx.fillStyle = "rgba(12, 74, 184, 0.55)";
     ctx.font = "bold 10px sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("مكتب وسام الشناوي", stampX, stampY - 12);
+    ctx.fillText("مكتب المحامي", stampX, stampY - 12);
     ctx.font = "bold 11px sans-serif";
     ctx.fillText("⚖️ محامي بالنقض ⚖️", stampX, stampY + 8);
     ctx.font = "bold 9px sans-serif";
@@ -946,17 +976,18 @@ export default function CasesView({
     });
   }, [cases, searchQuery, courtFilter, yearFilter, courtTypeFilter, sessionStatusFilter, currentUser]);
 
-  const handleOpenEmailModal = (c: CaseRecord) => {
+  const handleOpenEmailModal = (c: CaseRecord, customMessage?: string) => {
     setEmailNoticeCase(c);
     const client = clients.find(cl => cl.name.trim() === c.clientName.trim());
     const defaultEmail = client?.email || (client as any)?.gmail || `${c.clientName.replace(/\s+/g, '.').toLowerCase()}@client.wesam0law.com`;
     setEmailRecipientInput(defaultEmail);
     setEmailSubjectInput(`إشعار بمستجدات وتاريخ جلسة القضية رقم ${c.caseNumber} لسنة ${c.caseYear} - مكتب الشناوي للمحاماة`);
     setEmailBodyInput(
+      customMessage ||
 `عناية الأستاذ/ة المحترم/ة: ${c.clientName}،
 
 تحية طيبة وبعد،،
-نحيط سيادتكم علماً بآخر المستجدات والإجراءات القضائية المتخذة في ملف قضيتكم الموقرة لدى مكتب المستشار وسام الشناوي للمحاماة:
+نحيط سيادتكم علماً بآخر المستجدات والإجراءات القضائية المتخذة في ملف قضيتكم الموقرة لدى مكتب المستشار المحامي للمحاماة:
 
 • رقم القضية: ${c.caseNumber} لسنة ${c.caseYear}
 • المحكمة المختصة: ${c.competentCourt} (${c.courtType})
@@ -968,7 +999,7 @@ export default function CasesView({
 ${c.details || "تم قيد ومتابعة الإجراءات القانونية والمستندات اللازمة وتجهيز المذكرة والمستندات للجلسة المحددة."}
 
 مع أطيب التحيات والتقدير،
-مكتب المستشار وسام الشناوي للمحاماة والاستشارات القانونية`
+مكتب المستشار المحامي للمحاماة والاستشارات القانونية`
     );
     setEmailNoticeStatus(null);
   };
@@ -994,7 +1025,7 @@ ${c.details || "تم قيد ومتابعة الإجراءات القانونية
           message: emailBodyInput.trim(),
           sessionDate: emailNoticeCase.nextSessionDate,
           court: emailNoticeCase.competentCourt,
-          senderName: currentUser.name || "المستشار وسام الشناوي",
+          senderName: currentUser.name || "المستشار المحامي",
           notificationType: "session_reminder"
         })
       });
@@ -1016,7 +1047,7 @@ ${c.details || "تم قيد ومتابعة الإجراءات القانونية
           courtName: emailNoticeCase.competentCourt,
           status: "sent",
           sentAt: new Date().toISOString(),
-          sentBy: currentUser.name || "المستشار وسام الشناوي"
+          sentBy: currentUser.name || "المستشار المحامي"
         });
 
         setEmailNoticeStatus({
@@ -1048,7 +1079,7 @@ ${c.details || "تم قيد ومتابعة الإجراءات القانونية
         courtName: emailNoticeCase.competentCourt,
         status: "sent",
         sentAt: new Date().toISOString(),
-        sentBy: currentUser.name || "المستشار وسام الشناوي"
+        sentBy: currentUser.name || "المستشار المحامي"
       });
 
       setEmailNoticeStatus({
@@ -1156,7 +1187,7 @@ ${c.details || "تم قيد ومتابعة الإجراءات القانونية
     setCaseDetails("");
     setNextSession("");
     setAiFeeRecommendation(null);
-    alert("تم تدوين ونشر عريضة القضية وضمها لملفات الأستاذ وسام الشناوي المحامي سحابياً!");
+    alert("تم تدوين ونشر عريضة القضية وضمها لملفات الأستاذ المحامي المحامي سحابياً!");
   };
 
   const handlePrintCaseRecords = () => {
@@ -1167,14 +1198,8 @@ ${c.details || "تم قيد ومتابعة الإجراءات القانونية
     <div className="space-y-8 text-right font-sans" dir="rtl">
       
       {/* Title & Operations bar */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center flex-wrap gap-4">
+      <div className="flex justify-end items-center flex-wrap gap-4 mb-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">ملفات وطلبات الصحف القضائية ({visibleCases.length})</h2>
-          <p className="text-xs text-slate-500 mt-1">
-            {currentUser.role === UserRole.CLIENT 
-              ? "ملفات ودعاوى الموكل وسجلات القرارات والأقضية."
-              : "خزانة الملفات الشاملة لقضايا الجنايات، الجنح، محاكم الأسرة، والمدني بمحافظة الشرقية."}
-          </p>
         </div>
 
         {currentUser.role !== UserRole.CLIENT && (
@@ -1670,6 +1695,27 @@ ${c.details || "تم قيد ومتابعة الإجراءات القانونية
         </form>
       )}
 
+      {selectedCaseIds.length > 0 && (
+        <div className="flex items-center gap-3 p-3 mb-4 bg-amber-50 rounded-xl border border-amber-200">
+          <span className="text-xs font-bold text-amber-800">تم تحديد {selectedCaseIds.length} قضايا</span>
+          <button onClick={() => {
+            const updated = cases.filter(c => !selectedCaseIds.includes(c.id));
+            selectedCaseIds.forEach(id => {
+              if (onDeleteCase) onDeleteCase(id);
+            });
+            setSelectedCaseIds([]);
+          }} className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold rounded-lg transition">حذف المحدد</button>
+          <button onClick={() => {
+            selectedCaseIds.forEach(id => {
+              const c = cases.find(c => c.id === id);
+              if(c && onUpdateCase) onUpdateCase(id, { status: "archived" });
+            });
+            setSelectedCaseIds([]);
+          }} className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold rounded-lg transition">نقل للأرشيف</button>
+          <button onClick={() => setSelectedCaseIds([])} className="px-3 py-1.5 bg-white border border-slate-200 text-slate-500 text-xs font-bold rounded-lg transition">إلغاء التحديد</button>
+        </div>
+      )}
+
       {/* CASES DISPLAY CARD LIST */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {visibleCases.length === 0 ? (
@@ -1682,13 +1728,27 @@ ${c.details || "تم قيد ومتابعة الإجراءات القانونية
               id={`case-card-${c.id}`}
               key={c.id}
               onClick={() => setSelectedCase(c)}
-              className={`p-5 rounded-2xl border transition text-right space-y-4 shadow-sm hover:shadow-md ${
+              className={`p-5 rounded-2xl border transition text-right space-y-4 shadow-sm hover:shadow-md relative ${
                 selectedCase?.id === c.id 
                   ? "bg-white border-2 border-amber-500 scale-[1.01]" 
+                  : selectedCaseIds.includes(c.id)
+                  ? "bg-amber-50/50 border-amber-300"
                   : "bg-white border-slate-200 hover:border-slate-350"
               }`}
             >
-              <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+              <div className="absolute top-4 left-4 z-10" onClick={(e) => e.stopPropagation()}>
+                <input 
+                  type="checkbox"
+                  checked={selectedCaseIds.includes(c.id)}
+                  onChange={(e) => {
+                    if (e.target.checked) setSelectedCaseIds(prev => [...prev, c.id]);
+                    else setSelectedCaseIds(prev => prev.filter(id => id !== c.id));
+                  }}
+                  className="w-4 h-4 text-amber-500 rounded border-slate-300 focus:ring-amber-500 cursor-pointer"
+                />
+              </div>
+
+              <div className="flex justify-between items-center pb-2 border-b border-slate-100 pr-6">
                 <span className="px-2 py-0.5 bg-amber-50 rounded-lg text-amber-800 text-[10px] font-black font-sans">رقم {c.caseNumber} {c.caseYear && `سنة ${c.caseYear}`}</span>
                 <span className="text-slate-400 text-[10px] font-sans">مسلسل رقم: #{c.serialNumber}</span>
               </div>
@@ -1697,30 +1757,81 @@ ${c.details || "تم قيد ومتابعة الإجراءات القانونية
                 <p><span className="text-slate-400 font-bold ml-1.5">المحكمة المختصة:</span> <span className="text-slate-900 font-bold">{c.competentCourt}</span></p>
                 <p><span className="text-slate-400 font-bold ml-1.5">النوع الاختصاصي:</span> <span className="text-amber-805 font-bold">{c.courtType}</span></p>
                 <p><span className="text-slate-400 font-bold ml-1.5">الاتهام / الموضوع:</span> <span className="text-slate-950 font-black">{c.subject}</span></p>
-                <p><span className="text-slate-400 font-bold ml-1.5">الموكل (صفته):</span> <span className="text-slate-900 font-bold">{c.clientName}</span> (<span className="text-slate-550 font-bold">{c.clientRole}</span>)</p>
+                <p><span className="text-slate-400 font-bold ml-1.5">الموكل (صفته):</span> <span className="text-slate-900 font-bold">{c.clientName}</span> (<span className="text-slate-550 font-bold">{c.clientRole}</span> - <span className="text-amber-700 font-extrabold">{getClientRoleLabel(c.clientRole, c, language)}</span>)</p>
                 <p><span className="text-slate-400 font-bold ml-1.5">الخصم المرتبط:</span> <span className="text-red-700 font-bold">{c.opponentName}</span></p>
                 <p><span className="text-slate-400 font-bold ml-1.5">الجلسة القادمة:</span> <span className="text-amber-800 font-black font-mono text-sm">{c.nextSessionDate}</span></p>
               </div>
 
+              {/* Case Stage & Milestone Preview Chip */}
+              <div className="pt-1 flex flex-wrap items-center justify-between gap-1.5 border-t border-slate-100/80">
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-900 border border-amber-500/20 flex items-center gap-1">
+                  <Clock className="w-3 h-3 text-amber-600" />
+                  <span>
+                    {c.stage === "registered" ? "قيد الدعوى" : 
+                     c.stage === "first_session" ? "الجلسة الأولى" : 
+                     c.stage === "judgment" ? "صدور الحكم" : 
+                     c.stage === "appeal" ? "الاستئناف والطعن" : "محطات التقاضي"}
+                  </span>
+                  {c.timeline && (
+                    <span className="text-[9px] bg-white px-1 rounded font-mono text-amber-700 font-black">
+                      {c.timeline.filter(m => m.status === "completed").length}/{c.timeline.length}
+                    </span>
+                  )}
+                </span>
+
+                {keepExportSuccess === c.id ? (
+                  <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded">
+                    <Check className="w-3 h-3" /> تم الحفظ في Keep
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleExportCaseToKeep(c)}
+                    className="text-[10px] font-bold text-slate-500 hover:text-amber-700 flex items-center gap-1 transition cursor-pointer"
+                    title="حفظ بطاقة ملخص في Google Keep"
+                  >
+                    <Bookmark className="w-3 h-3 text-amber-500" />
+                    <span>حفظ في Keep</span>
+                  </button>
+                )}
+              </div>
+
               {/* Action Toolbar */}
-              <div className="flex items-center justify-between pt-2 border-t border-slate-100 font-sans" onClick={(e) => e.stopPropagation()}>
-                <button
-                  type="button"
-                  onClick={() => setSelectedCase(c)}
-                  className="text-xs font-bold text-amber-600 hover:text-amber-700 flex items-center gap-1 cursor-pointer"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>فتح الملف والمستندات</span>
-                </button>
+              <div className="flex flex-wrap items-center justify-between gap-1.5 pt-2 border-t border-slate-100 font-sans" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCase(c);
+                      setDrawerActiveTab("details");
+                    }}
+                    className="text-xs font-bold text-slate-700 hover:text-amber-700 flex items-center gap-1 cursor-pointer bg-slate-100/70 hover:bg-slate-200/70 px-2 py-1 rounded-lg transition"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>الملف</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCase(c);
+                      setDrawerActiveTab("timeline");
+                    }}
+                    className="text-xs font-black text-amber-900 bg-amber-100 hover:bg-amber-200 px-2.5 py-1 rounded-lg transition flex items-center gap-1 cursor-pointer shadow-2xs"
+                  >
+                    <Clock className="w-3.5 h-3.5 text-amber-700" />
+                    <span>⏱️ المسار الزمني</span>
+                  </button>
+                </div>
 
                 <button
                   type="button"
                   onClick={() => handleOpenEmailModal(c)}
-                  className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-lg text-[11px] font-bold border border-amber-200/60 transition cursor-pointer flex items-center gap-1"
+                  className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-lg text-[11px] font-bold border border-amber-200/60 transition cursor-pointer flex items-center gap-1"
                   title="إرسال تنبيه بالبريد الإلكتروني لموكل هذه القضية"
                 >
-                  <Mail className="w-3.5 h-3.5 text-amber-600" />
-                  <span>📧 إشعار بريدي للموكل</span>
+                  <Mail className="w-3 h-3 text-amber-600" />
+                  <span>📧 إشعار</span>
                 </button>
               </div>
 
@@ -1757,6 +1868,48 @@ ${c.details || "تم قيد ومتابعة الإجراءات القانونية
               <p className="text-[10px] text-slate-400">سجل إلكتروني معزول مشفر لضمان سرية البيانات والمستندات القضائية.</p>
             </div>
 
+            {/* Drawer Tabs Navigation */}
+            <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-bold gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => setDrawerActiveTab("details")}
+                className={`flex-1 py-1.5 px-2 rounded-lg transition text-center flex items-center justify-center gap-1.5 cursor-pointer ${
+                  drawerActiveTab === "details"
+                    ? "bg-white text-slate-950 shadow-xs font-black"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>بيانات ومستندات الدعوى</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDrawerActiveTab("timeline")}
+                className={`flex-1 py-1.5 px-2 rounded-lg transition text-center flex items-center justify-center gap-1.5 cursor-pointer ${
+                  drawerActiveTab === "timeline"
+                    ? "bg-amber-500 text-slate-950 shadow-xs font-black"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>⏱️ المسار والجدول الزمني</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDrawerActiveTab("keep")}
+                className={`flex-1 py-1.5 px-2 rounded-lg transition text-center flex items-center justify-center gap-1.5 cursor-pointer ${
+                  drawerActiveTab === "keep"
+                    ? "bg-white text-amber-700 shadow-xs font-black border border-amber-200"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <Bookmark className="w-3.5 h-3.5 text-amber-500" />
+                <span>📌 Google Keep</span>
+              </button>
+            </div>
+
             {/* Authorization Block */}
             {!isAuthorizedForCase ? (
               <div className="flex-1 py-12 flex flex-col items-center justify-center text-center space-y-3">
@@ -1766,7 +1919,59 @@ ${c.details || "تم قيد ومتابعة الإجراءات القانونية
                   هذا الملف القضائي والوثائق الملحقة به مشفرة ومؤمنة بالكامل للسرية الرقمية. صلاحيات العرض تنحصر حصرياً على الأستاذ وسام، السكرتارية، والموكل المعني مباشرة بالقضية.
                 </p>
               </div>
+            ) : drawerActiveTab === "timeline" ? (
+              /* TAB 2: INTERACTIVE VERTICAL TIMELINE */
+              <div className="flex-grow space-y-4 overflow-y-auto pr-1">
+                <CaseTimeline
+                  caseRecord={selectedCase}
+                  onUpdateCase={(caseId, updatedFields) => {
+                    if (onUpdateCase) {
+                      onUpdateCase(caseId, updatedFields);
+                      setSelectedCase(prev => prev ? { ...prev, ...updatedFields } : null);
+                    }
+                  }}
+                  currentUser={currentUser}
+                  language={language}
+                  onSendNotification={(milestone) => {
+                    handleOpenEmailModal(
+                      selectedCase,
+                      `إشعار تحديث محطة قضائية: ${milestone.title}\nالتاريخ: ${milestone.date}\nالحالة: ${milestone.status}\nملاحظات: ${milestone.decisionOrNotes || "لا توجد ملاحظات إضافية"}`
+                    );
+                  }}
+                />
+              </div>
+            ) : drawerActiveTab === "keep" ? (
+              /* TAB 3: GOOGLE KEEP QUICK CASE MEMOS */
+              <div className="flex-grow space-y-4 overflow-y-auto pr-1">
+                <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-black text-amber-950 flex items-center gap-1.5">
+                      <Bookmark className="w-4 h-4 text-amber-600" />
+                      <span>تكامل Google Keep السريع لملف هذه القضية</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => window.open("https://keep.google.com/", "_blank")}
+                      className="text-[10px] font-bold text-amber-800 hover:text-amber-950 underline"
+                    >
+                      فتح keep.google.com ↗
+                    </button>
+                  </div>
+                  <p className="text-xs text-amber-800 leading-relaxed">
+                    يمكنك حفظ وتصدير بطاقة هذه القضية وملاحظات الجلسات إلى تطبيق Google Keep الخاص بك بضغطة واحدة، أو نسخ نص المذكرة للاستخدام السريع.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleExportCaseToKeep(selectedCase)}
+                    className="w-full py-2 bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-black rounded-xl text-xs transition cursor-pointer shadow-sm flex items-center justify-center gap-1.5"
+                  >
+                    <Bookmark className="w-4 h-4" />
+                    <span>{keepExportSuccess === selectedCase.id ? "✓ تم حفظ المذكرة بنجاح في Google Keep" : "📌 تصدير بطاقة القضية إلى Google Keep الآن"}</span>
+                  </button>
+                </div>
+              </div>
             ) : (
+              /* TAB 1: CASE DETAILS & ATTACHMENTS */
               <div className="flex-grow space-y-5 overflow-y-auto pr-1">
                 {/* 1. Case Metadata Breakdown */}
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/60 space-y-2 text-xs">
@@ -1774,7 +1979,7 @@ ${c.details || "تم قيد ومتابعة الإجراءات القانونية
                   <p className="flex justify-between border-b border-slate-100 pb-1.5"><span className="text-slate-400">المحكمة المختصة:</span> <strong className="text-slate-900">{selectedCase.competentCourt}</strong></p>
                   <p className="flex justify-between border-b border-slate-100 pb-1.5"><span className="text-slate-400">نوع المحكمية:</span> <span className="text-slate-800 font-bold">{selectedCase.courtType}</span></p>
                   <p className="flex justify-between border-b border-slate-100 pb-1.5"><span className="text-slate-400">الاتهام/الموضوع الرئيسي:</span> <strong className="text-slate-950">{selectedCase.subject}</strong></p>
-                  <p className="flex justify-between border-b border-slate-100 pb-1.5"><span className="text-slate-400">الموكل (الصفة):</span> <strong className="text-slate-900">{selectedCase.clientName} ({selectedCase.clientRole})</strong></p>
+                  <p className="flex justify-between border-b border-slate-100 pb-1.5"><span className="text-slate-400">الموكل (الصفة والوكالة):</span> <strong className="text-slate-900">{selectedCase.clientName} ({selectedCase.clientRole} - {getClientRoleLabel(selectedCase.clientRole, selectedCase, language)})</strong></p>
                   <p className="flex justify-between border-b border-slate-100 pb-1.5"><span className="text-slate-400">الخصم المسجل:</span> <strong className="text-red-700">{selectedCase.opponentName}</strong></p>
                   <p className="flex justify-between pb-0.5"><span className="text-slate-400 font-bold">تاريخ الجلسة القادمة لعام ٢٠٢٦:</span> <span className="text-amber-800 font-extrabold font-mono text-sm bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded">{selectedCase.nextSessionDate}</span></p>
                 </div>
@@ -2397,7 +2602,7 @@ ${c.details || "تم قيد ومتابعة الإجراءات القانونية
 
             {/* Footer lock tag */}
             <div className="text-center text-[10px] text-slate-400 pt-3 border-t border-slate-100 font-sans">
-              🔒 خادم التشفير نشط لعام ٢٠٢٦ - وسام الشناوي المحامي
+              🔒 خادم التشفير نشط لعام ٢٠٢٦ - المحامي المحامي
             </div>
           </div>
         </div>

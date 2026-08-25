@@ -28,7 +28,7 @@ export default function LawCodesView({ lawCodes, onAddCode, currentUser }: LawCo
     setIsAiSearching(true);
     setAiAnalysisResult("");
     try {
-      const prompt = `أنت الخبير الدستوري المساعد لمكتب الأستاذ وسام الشناوي. 
+      const prompt = `أنت الخبير الدستوري المساعد لمكتب الأستاذ المحامي. 
 لقد سأل الموكل أو السائل السؤال أو المسألة التالية المتعلقة بالقوانين المصرية:
 "${searchQuery}"
 
@@ -135,7 +135,7 @@ export default function LawCodesView({ lawCodes, onAddCode, currentUser }: LawCo
 
         {aiAnalysisResult && (
           <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-200 space-y-2 mt-3 leading-relaxed animate-fade-in">
-            <h4 className="text-xs font-bold text-emerald-800">توجيهات وتحليلات ذكاء المنصة (مكتب وسام الشناوي):</h4>
+            <h4 className="text-xs font-bold text-emerald-800">توجيهات وتحليلات ذكاء المنصة (مكتب المحامي):</h4>
             <p className="text-slate-800 leading-relaxed font-sans whitespace-pre-line text-right p-1 max-h-56 overflow-y-auto">{aiAnalysisResult}</p>
           </div>
         )}

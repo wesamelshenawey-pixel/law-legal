@@ -1,17 +1,52 @@
 const fs = require('fs');
-const content = fs.readFileSync('src/components/LoginView.tsx', 'utf8');
+let content = fs.readFileSync('src/components/LoginView.tsx', 'utf8');
 
-const staff_tab = `
-            <button
-              onClick={() => { setActiveTab(UserRole.STAFF); setErrorMsg(""); }}
-              className={\`flex-1 py-4 font-black transition-all cursor-pointer \${
-                activeTab === UserRole.STAFF
-                  ? "border-b-2 border-amber-600 text-amber-800 dark:text-amber-500 bg-white dark:bg-slate-900"
-                  : "text-slate-500 dark:text-slate-400 hover:text-slate-800 hover:bg-slate-100/50"
-              }\`}
-            >
-              {t("login_tab_lawyer")}
-            </button>`;
+content = content.replace(
+  /<div className="flex gap-2" dir="ltr">\s*<select[\s\S]*?<\/select>\s*<input\s*type="tel"\s*value={phone}\s*onChange={\(e\) => setPhone\(e.target.value\)}[\s\S]*?\/>\s*<\/div>/g,
+  `<PhoneInputWithCountry
+                      value={phoneCode + phone}
+                      onChange={(full, code, num) => {
+                        setPhoneCode(code);
+                        setPhone(num);
+                      }}
+                    />`
+);
 
-const new_content = content.replace('{t("login_tab_admin")}\n            </button>', '{t("login_tab_admin")}\n            </button>' + staff_tab);
-fs.writeFileSync('src/components/LoginView.tsx', new_content);
+content = content.replace(
+  /<div className="flex gap-2" dir="ltr">\s*<select[\s\S]*?<\/select>\s*<input\s*type="tel"\s*value={signupPhone}\s*onChange={\(e\) => setSignupPhone\(e.target.value\)}[\s\S]*?\/>\s*<\/div>/g,
+  `<PhoneInputWithCountry
+                      value={signupPhoneCode + signupPhone}
+                      onChange={(full, code, num) => {
+                        setSignupPhoneCode(code);
+                        setSignupPhone(num);
+                      }}
+                    />`
+);
+
+content = content.replace(
+  /<div className="flex gap-2" dir="ltr">\s*<select[\s\S]*?<\/select>\s*<input\s*type="tel"\s*value={lawFirmPhone}\s*onChange={\(e\) => setLawFirmPhone\(e.target.value\)}[\s\S]*?\/>\s*<\/div>/g,
+  `<PhoneInputWithCountry
+                      value={lawFirmPhoneCode + lawFirmPhone}
+                      onChange={(full, code, num) => {
+                        setLawFirmPhoneCode(code);
+                        setLawFirmPhone(num);
+                      }}
+                    />`
+);
+
+content = content.replace(
+  /<div className="flex gap-2" dir="ltr">\s*<select[\s\S]*?<\/select>\s*<input\s*type="tel"\s*value={resetPhone}\s*onChange={\(e\) => setResetPhone\(e.target.value\)}[\s\S]*?\/>\s*<\/div>/g,
+  `<PhoneInputWithCountry
+                      value={resetPhoneCode + resetPhone}
+                      onChange={(full, code, num) => {
+                        setResetPhoneCode(code);
+                        setResetPhone(num);
+                      }}
+                    />`
+);
+
+if (!content.includes('import PhoneInputWithCountry')) {
+  content = content.replace('import React, { useState } from "react";', 'import React, { useState } from "react";\nimport PhoneInputWithCountry from "./PhoneInputWithCountry";');
+}
+
+fs.writeFileSync('src/components/LoginView.tsx', content);

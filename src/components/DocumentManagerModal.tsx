@@ -12,7 +12,7 @@ import {
   Sparkles,
   Printer,
   Trash2,
-  Download,
+  Download, QrCode, History,
   Camera,
   CheckSquare,
   Square,
@@ -23,8 +23,15 @@ import {
   CheckCircle2,
   AlertCircle,
   Tag,
-  BookOpen
+  BookOpen, X
 } from "lucide-react";
+
+export interface DocumentVersion {
+  id: string;
+  dataUrl: string;
+  size: string;
+  uploadedAt: string;
+}
 
 export interface ManagedDocument {
   id: string;
@@ -34,6 +41,7 @@ export interface ManagedDocument {
   section: "cases" | "documentation" | "adminwork" | "clients" | string;
   sectionLabel: string;
   fileBase64?: string;
+  versions?: DocumentVersion[];
   url?: string;
   addedAt: string;
   aiSummary?: string;
@@ -93,7 +101,7 @@ export default function DocumentManagerModal({
         section: "clients",
         sectionLabel: "شؤون الموكلين",
         addedAt: new Date().toISOString(),
-        aiSummary: "صورة ضوئية لتوكيل رسمي عام في القضايا برقم 102 لسنة 2026 مكتب توثيق ههيا النموذجي لصالح الأستاذ وسام الشناوي.",
+        aiSummary: "صورة ضوئية لتوكيل رسمي عام في القضايا برقم 102 لسنة 2026 مكتب توثيق ههيا النموذجي لصالح الأستاذ المحامي.",
         aiTags: ["توكيل رسمي", "مكتب ههيا", "إثبات صفة"],
         aiAnalyzed: true
       }
@@ -101,6 +109,8 @@ export default function DocumentManagerModal({
   });
 
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
+  const [showVersionsForDoc, setShowVersionsForDoc] = useState<string | null>(null);
+  const [showQrForDoc, setShowQrForDoc] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [sectionFilter, setSectionFilter] = useState<string>("all");
   const [isExtractingZip, setIsExtractingZip] = useState(false);
@@ -214,9 +224,44 @@ export default function DocumentManagerModal({
     }
 
     if (newExtractedDocs.length > 0) {
-      const updated = [...newExtractedDocs, ...documents];
-      saveDocs(updated);
-      onAddDocuments(newExtractedDocs);
+      let currentDocs = [...documents];
+      const newlyAddedDocs: ManagedDocument[] = [];
+
+      for (const newDoc of newExtractedDocs) {
+        const existingDocIndex = currentDocs.findIndex(d => d.name === newDoc.name && d.section === newDoc.section);
+        if (existingDocIndex >= 0) {
+          const existingDoc = currentDocs[existingDocIndex];
+          const newVersion = {
+            id: existingDoc.id,
+            name: existingDoc.name,
+            size: newDoc.size,
+            type: newDoc.type,
+            section: existingDoc.section,
+            sectionLabel: existingDoc.sectionLabel,
+            fileBase64: newDoc.fileBase64,
+            addedAt: newDoc.addedAt,
+            aiSummary: existingDoc.aiSummary,
+            aiTags: existingDoc.aiTags,
+            versions: [
+              ...(existingDoc.versions || []),
+              {
+                id: `ver-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+                dataUrl: existingDoc.fileBase64 || "",
+                size: existingDoc.size,
+                uploadedAt: existingDoc.addedAt
+              }
+            ]
+          };
+          currentDocs[existingDocIndex] = newVersion;
+          newlyAddedDocs.push(newVersion);
+        } else {
+          currentDocs = [newDoc, ...currentDocs];
+          newlyAddedDocs.push(newDoc);
+        }
+      }
+
+      saveDocs(currentDocs);
+      onAddDocuments(newlyAddedDocs);
     }
   };
 
@@ -251,7 +296,7 @@ export default function DocumentManagerModal({
       // Judicial watermark
       ctx.fillStyle = "rgba(217, 119, 6, 0.4)";
       ctx.font = "bold 24px sans-serif";
-      ctx.fillText("مكتب الأستاذ وسام الشناوي المحامي ⚖️ - مسح ضوئي معتمد", 40, canvas.height - 40);
+      ctx.fillText("مكتب الأستاذ المحامي المحامي ⚖️ - مسح ضوئي معتمد", 40, canvas.height - 40);
       const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
       setCapturedPhoto(dataUrl);
     }
@@ -790,6 +835,22 @@ export default function DocumentManagerModal({
                             تحميل
                           </a>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => setShowQrForDoc(doc.id)}
+                          className="text-slate-500 hover:text-amber-500 font-bold flex items-center gap-1 cursor-pointer"
+                        >
+                          <QrCode className="w-3 h-3" />
+                          QR
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowVersionsForDoc(doc.id)}
+                          className="text-slate-500 hover:text-amber-500 font-bold flex items-center gap-1 cursor-pointer"
+                        >
+                          <History className="w-3 h-3" />
+                          النسخ
+                        </button>
                       </div>
 
                       <button
@@ -813,7 +874,7 @@ export default function DocumentManagerModal({
         {/* Modal Footer */}
         <div className="p-4 bg-slate-50 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center">
           <p className="text-[11px] text-slate-500">
-            مكتب الأستاذ وسام الشناوي للمحاماة • نظام إدارة المستندات السحابية المتكامل
+            مكتب الأستاذ المحامي للمحاماة • نظام إدارة المستندات السحابية المتكامل
           </p>
           <button
             type="button"
@@ -824,6 +885,79 @@ export default function DocumentManagerModal({
           </button>
         </div>
       </div>
+
+      {showQrForDoc && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4 font-sans text-right">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-sm flex flex-col items-center gap-4 animate-in zoom-in-95">
+            <h3 className="font-bold text-slate-900 dark:text-white">QR Code - مشاركة المستند</h3>
+            <p className="text-xs text-slate-500 text-center">امسح الكود لفتح المستند على الهاتف الذكي</p>
+            <div className="bg-white p-2 rounded-xl shadow-inner border border-slate-200">
+              <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://law-app.local/doc/${showQrForDoc}`} alt="QR Code" className="w-48 h-48" />
+            </div>
+            <button
+              onClick={() => setShowQrForDoc(null)}
+              className="mt-2 px-6 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-900 dark:text-white font-bold rounded-xl text-xs transition"
+            >
+              إغلاق
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showVersionsForDoc && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4 font-sans text-right">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md flex flex-col shadow-2xl animate-in zoom-in-95">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950 rounded-t-2xl">
+              <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <History className="w-5 h-5 text-amber-500" />
+                سجل إصدارات المستند
+              </h3>
+              <button onClick={() => setShowVersionsForDoc(null)} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 max-h-96 overflow-y-auto space-y-3">
+              {documents.find(d => d.id === showVersionsForDoc)?.versions?.length ? (
+                documents.find(d => d.id === showVersionsForDoc)?.versions?.map((ver, idx) => (
+                  <div key={ver.id} className="p-3 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-900 flex justify-between items-center">
+                    <div>
+                      <p className="text-xs font-bold text-slate-900 dark:text-slate-100">إصدار {idx + 1}</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">{new Date(ver.uploadedAt).toLocaleString('ar-EG')}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <a href={ver.dataUrl} download className="p-1.5 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition" title="تحميل">
+                        <Download className="w-4 h-4" />
+                      </a>
+                      <button 
+                        onClick={() => {
+                          const updated = documents.map(d => {
+                            if (d.id === showVersionsForDoc) {
+                              return { ...d, fileBase64: ver.dataUrl, size: ver.size };
+                            }
+                            return d;
+                          });
+                          saveDocs(updated);
+                          alert("تم استعادة المستند للإصدار المحدد بنجاح");
+                          setShowVersionsForDoc(null);
+                        }}
+                        className="p-1.5 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition"
+                        title="استعادة هذا الإصدار"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-6 text-slate-500 text-xs">
+                  لا يوجد سجل إصدارات محفوظ لهذا المستند.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

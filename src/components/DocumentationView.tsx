@@ -61,7 +61,7 @@ export default function DocumentationView() {
             "ألا يقل السن عن 21 عاماً لكلا الطرفين قانوناً."
           ],
           approxFees: "حوالي 2,000 إلى 4,500 جنيه مصري كرسوم إدارية حكومية ومراجعة صحة الطابع.",
-          aiAdvice: "الأفضل تكليف السيد الأستاذ وسام الشناوي لمراجعة شهادة عدم الممانعة بالسفارة مسبقاً لتفادي التأخير الإداري."
+          aiAdvice: "الأفضل تكليف السيد الأستاذ المحامي لمراجعة شهادة عدم الممانعة بالسفارة مسبقاً لتفادي التأخير الإداري."
         });
       } else {
         setAiDocReport({
@@ -114,7 +114,7 @@ export default function DocumentationView() {
     const title = docCategory === "foreign_marriage" ? "عقد زواج أجانب استرشادي وزارة العدل" : "طلب توثيق زواج أصحاب عقائد مختلفة";
     const textContent = `
 ========================================
-مكتب الأستاذ المستشار وسام الشناوي المحامى
+مكتب الأستاذ المستشار المحامي المحامى
 صيغة استرشادية لعقود الأحوال الشخصية وملف التوثيق
 ========================================
 
@@ -138,7 +138,7 @@ export default function DocumentationView() {
 - طوابع وتأكيدات الأحوال الشخصية.
 - حضور الطرفين بشخصهما مع عدد ٢ شهود عادل وبطاقات إثبات هويتهم سارية.
 
-تم تحرير وصناعة هذه الصيغة بطلب استرشادي الكتروني من خزانة مكتب الأستاذ وسام الشناوي المحامى.
+تم تحرير وصناعة هذه الصيغة بطلب استرشادي الكتروني من خزانة مكتب الأستاذ المحامي المحامى.
 تاريخ التوليد: ${new Date().toLocaleDateString("ar-EG")}
 ========================================
     `.trim();
@@ -237,7 +237,7 @@ export default function DocumentationView() {
         <div className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm text-xs leading-relaxed text-slate-800 text-right">
           <h3 className="text-sm font-bold text-slate-900 flex items-center justify-start gap-1 border-b border-slate-100 pb-1.5">
             <Cpu className="w-4 h-4 text-amber-500 animate-pulse" />
-            مرئيات وشروط التوثيق النهائي (مكتب وسام الشناوي)
+            مرئيات وشروط التوثيق النهائي (مكتب المحامي)
           </h3>
 
           {aiDocReport ? (

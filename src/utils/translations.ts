@@ -197,4 +197,106 @@ export const TRANSLATIONS: { [key: string]: { [lang: string]: string } } = {
     en: "Telegram channel for Court Clerks"
   }
 };
+
+/**
+ * Returns the formal judicial representation title of the attorney based on client's role
+ * e.g., 'مدعي' -> 'وكيل المدعي', 'متهم' -> 'وكيل المتهم', 'مستأنف' -> 'وكيل المستأنف'
+ */
+export function getClientRoleLabel(role?: string, caseRecord?: any, lang: "ar" | "en" = "ar"): string {
+  const normalizedRole = (role || caseRecord?.clientRole || "").trim();
+
+  if (lang === "en") {
+    switch (normalizedRole) {
+      case "مدعي":
+        return "Counsel for the Plaintiff";
+      case "مدعى عليه":
+        return "Counsel for the Defendant";
+      case "متهم":
+        return "Defense Counsel for the Accused";
+      case "مجني عليه":
+      case "شاكي":
+        return "Counsel for the Victim / Complainant";
+      case "مستأنف":
+        return "Counsel for the Appellant";
+      case "مستأنف ضده":
+        return "Counsel for the Appellee";
+      case "طاعن":
+        return "Counsel for the Petitioner (Cassation)";
+      case "مطعون ضده":
+        return "Counsel for the Respondent";
+      case "معارض":
+        return "Counsel for the Opposer";
+      case "محكوم لصالحه":
+      case "طالب التنفيذ":
+        return "Counsel for the Execution Applicant";
+      case "محكوم ضده":
+      case "المنفذ ضده":
+        return "Counsel for the Judgment Debtor";
+      case "مستشكل":
+        return "Counsel for the Stay Applicant";
+      case "مستشكل ضده":
+        return "Counsel for the Respondent in Stay";
+      case "حاضر":
+      case "وكيل":
+        return "Legal Representative";
+      default:
+        return normalizedRole ? `Counsel for the ${normalizedRole}` : "Legal Counsel";
+    }
+  }
+
+  // Arabic judicial representations
+  switch (normalizedRole) {
+    case "مدعي":
+      return "وكيل المدعي";
+    case "مدعى عليه":
+      return "وكيل المدعى عليه";
+    case "متهم":
+      return "وكيل المتهم";
+    case "مجني عليه":
+      return "وكيل المجني عليه";
+    case "شاكي":
+      return "وكيل الشاكي";
+    case "مستأنف":
+      return "وكيل المستأنف";
+    case "مستأنف ضده":
+      return "وكيل المستأنف ضده";
+    case "طاعن":
+      return "وكيل الطاعن";
+    case "مطعون ضده":
+      return "وكيل المطعون ضده";
+    case "معارض":
+      return "وكيل المعارض";
+    case "معارض ضده":
+      return "وكيل المعارض ضده";
+    case "طالب التنفيذ":
+      return "وكيل طالب التنفيذ";
+    case "المنفذ ضده":
+      return "وكيل المنفذ ضده";
+    case "محكوم لصالحه":
+      return "وكيل المحكوم لصالحه";
+    case "محكوم ضده":
+      return "وكيل المحكوم ضده";
+    case "مستشكل":
+      return "وكيل المستشكل";
+    case "مستشكل ضده":
+      return "وكيل المستشكل ضده";
+    case "مدعي بالحق المدني":
+      return "وكيل المدعي بالحق المدني";
+    case "مسؤول عن الحقوق المدنية":
+      return "وكيل المسؤول عن الحقوق المدنية";
+    case "طرف أول":
+      return "وكيل الطرف الأول";
+    case "طرف ثاني":
+      return "وكيل الطرف الثاني";
+    default:
+      if (normalizedRole) {
+        if (normalizedRole.startsWith("وكيل")) {
+          return normalizedRole;
+        }
+        return `وكيل ${normalizedRole}`;
+      }
+      return "وكيل صاحب الشأن";
+  }
+}
+
 export default TRANSLATIONS;

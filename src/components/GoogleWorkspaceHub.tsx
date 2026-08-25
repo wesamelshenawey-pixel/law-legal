@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { PlatformUser, CaseRecord, ClientProfile, SessionRecord } from "../types";
+import { PlatformUser, CaseRecord, ClientProfile, SessionRecord, UserRole } from "../types";
 import {
   getStoredWorkspaceToken,
   requestWorkspaceAuth,
@@ -16,6 +16,8 @@ import {
   getLocalKeepMemos,
   saveLocalKeepMemo,
   deleteLocalKeepMemo,
+  signLocalKeepMemo,
+  requestSignatureForKeepMemo,
   GmailMessage,
   ChatSpace,
   ChatMessage,
@@ -24,6 +26,9 @@ import {
   GoogleMeetRoom,
   GoogleKeepNote
 } from "../utils/workspaceService";
+import ElectronicSignatureModal from "./ElectronicSignatureModal";
+import RequestSignatureLinkModal from "./RequestSignatureLinkModal";
+import ClientSignatureConfirmationPortal from "./ClientSignatureConfirmationPortal";
 import {
   Mail,
   MessageSquare,
@@ -45,7 +50,17 @@ import {
   Plus,
   Trash2,
   Download,
-  Sparkles
+  Sparkles,
+  FileCheck2,
+  ShieldCheck,
+  PenTool,
+  Award,
+  Filter,
+  UserCheck,
+  Clock,
+  SendHorizontal,
+  Link2,
+  History
 } from "lucide-react";
 
 interface GoogleWorkspaceHubProps {
@@ -82,7 +97,7 @@ export default function GoogleWorkspaceHub({
   // 2. Google Meet State
   const [activeMeetRoom, setActiveMeetRoom] = useState<GoogleMeetRoom | null>(null);
   const [isCreatingMeet, setIsCreatingMeet] = useState(false);
-  const [meetTopic, setMeetTopic] = useState("استشارة قانونية مرئية - مكتب الأستاذ وسام الشناوي");
+  const [meetTopic, setMeetTopic] = useState("استشارة قانونية مرئية - مكتب الأستاذ المحامي");
   const [selectedCaseForMeet, setSelectedCaseForMeet] = useState("");
   const [copiedLink, setCopiedLink] = useState(false);
   const [meetHistory, setMeetHistory] = useState<GoogleMeetRoom[]>(() => {
@@ -100,6 +115,36 @@ export default function GoogleWorkspaceHub({
   const [newNoteContent, setNewNoteContent] = useState("");
   const [newNoteTag, setNewNoteTag] = useState("مذكرة قضائية");
   const [keepSearch, setKeepSearch] = useState("");
+  const [requireSignatureOnNewNote, setRequireSignatureOnNewNote] = useState(false);
+  const [selectedClientForNote, setSelectedClientForNote] = useState("");
+  const [selectedCaseForNote, setSelectedCaseForNote] = useState("");
+  const [customAffirmation, setCustomAffirmation] = useState("");
+  const [filterSignatureStatus, setFilterSignatureStatus] = useState<"all" | "requires_sig" | "pending" | "signed">("all");
+  const [selectedNoteForSignature, setSelectedNoteForSignature] = useState<GoogleKeepNote | null>(null);
+  const [isSignatureModalOpen, setIsSignatureModalOpen] = useState(false);
+  const [selectedNoteForRequestLink, setSelectedNoteForRequestLink] = useState<GoogleKeepNote | null>(null);
+  const [isRequestLinkModalOpen, setIsRequestLinkModalOpen] = useState(false);
+  const [selectedNoteForClientPortal, setSelectedNoteForClientPortal] = useState<GoogleKeepNote | null>(null);
+  const [isClientPortalOpen, setIsClientPortalOpen] = useState(false);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
+
+  // Check URL parameters for direct link signing (?action=sign_memo&memoId=...)
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const action = params.get("action");
+      const memoId = params.get("memoId");
+      if (action === "sign_memo" && memoId) {
+        const targetNote = keepNotes.find(n => n.id === memoId);
+        if (targetNote) {
+          setSelectedNoteForClientPortal(targetNote);
+          setIsClientPortalOpen(true);
+        }
+      }
+    } catch {
+      // url param check fallback
+    }
+  }, [keepNotes]);
 
   // 4. Gmail State
   const [gmailMessages, setGmailMessages] = useState<GmailMessage[]>([]);
@@ -188,7 +233,7 @@ export default function GoogleWorkspaceHub({
     setLastExportedUrl(null);
     try {
       const nowStr = new Date().toLocaleDateString("ar-EG");
-      const title = `سجل مكتب الأستاذ وسام الشناوي القضائي الشامل - ${nowStr}`;
+      const title = `سجل مكتب الأستاذ المحامي القضائي الشامل - ${nowStr}`;
 
       // Cases Sheet Data
       const casesHeader = ["م", "رقم الدعوى", "السنة", "المحكمة المختصة", "نوع المحكمة", "الموضوع", "الموكل", "صفة الموكل", "الخصم المقابل", "الجلسة القادمة", "تاريخ القيد"];
@@ -301,7 +346,7 @@ export default function GoogleWorkspaceHub({
 
   const handleShareViaWhatsApp = (url: string, title: string) => {
     const text = encodeURIComponent(`🏛️ *دعوة لحضور استشارة قانونية مرئية عبر Google Meet*
-من مكتب الأستاذ وسام الشناوي المحامي بالنقض
+من مكتب الأستاذ المحامي المحامي بالنقض
 📌 الموضوع: ${title}
 🔗 رابط الانضمام المباشر: ${url}
 نتطلع لمقابلتكم.`);
@@ -309,25 +354,120 @@ export default function GoogleWorkspaceHub({
   };
 
   // ==========================================
-  // GOOGLE KEEP ACTIONS
+  // GOOGLE KEEP & ELECTRONIC SIGNATURE ACTIONS
   // ==========================================
   const handleAddKeepNote = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newNoteTitle.trim() || !newNoteContent.trim()) return;
+
+    let targetClientName = "";
+    let targetClientPhone = "";
+    let targetClientId = "";
+
+    if (selectedClientForNote) {
+      const foundCl = clients.find(c => c.id === selectedClientForNote || c.name === selectedClientForNote);
+      if (foundCl) {
+        targetClientName = foundCl.name;
+        targetClientPhone = foundCl.phone || "";
+        targetClientId = foundCl.id;
+      } else {
+        targetClientName = selectedClientForNote;
+      }
+    } else if (currentUser.role === UserRole.CLIENT) {
+      targetClientName = currentUser.name;
+      targetClientPhone = currentUser.phone;
+      targetClientId = currentUser.id;
+    }
+
     const added = saveLocalKeepMemo({
       title: newNoteTitle.trim(),
       content: newNoteContent.trim(),
       tags: [newNoteTag],
-      pinned: false
+      pinned: false,
+      requiresSignature: requireSignatureOnNewNote,
+      signatureRequestedBy: currentUser.role === UserRole.CLIENT ? "client" : "lawyer",
+      clientId: targetClientId || undefined,
+      clientName: targetClientName || undefined,
+      clientPhone: targetClientPhone || undefined,
+      caseNumber: selectedCaseForNote || undefined,
+      legalAffirmation: customAffirmation.trim() || undefined,
+      signatureStatus: requireSignatureOnNewNote ? "pending" : "none"
     });
-    setKeepNotes([added, ...keepNotes]);
+
+    setKeepNotes([added, ...keepNotes.filter(n => n.id !== added.id)]);
     setNewNoteTitle("");
     setNewNoteContent("");
+    setRequireSignatureOnNewNote(false);
+    setSelectedClientForNote("");
+    setSelectedCaseForNote("");
+    setCustomAffirmation("");
+
+    setSuccessToast(
+      requireSignatureOnNewNote
+        ? "تم حفظ المذكرة وإرسال طلب التوقيع والتأكيد الإلكتروني للموكل بنجاح!"
+        : "تم حفظ المذكرة بنجاح في Google Keep!"
+    );
+    setTimeout(() => setSuccessToast(null), 3000);
   };
 
   const handleDeleteKeepNote = (id: string) => {
     deleteLocalKeepMemo(id);
     setKeepNotes(keepNotes.filter(n => n.id !== id));
+  };
+
+  const handleOpenSignatureModal = (note: GoogleKeepNote) => {
+    setSelectedNoteForSignature(note);
+    setIsSignatureModalOpen(true);
+  };
+
+  const handleOpenRequestSignatureModal = (note: GoogleKeepNote) => {
+    setSelectedNoteForRequestLink(note);
+    setIsRequestLinkModalOpen(true);
+  };
+
+  const handleOpenClientPortal = (note: GoogleKeepNote) => {
+    setSelectedNoteForClientPortal(note);
+    setIsClientPortalOpen(true);
+  };
+
+  const handleSignCompleted = (signedNote: GoogleKeepNote) => {
+    setKeepNotes(keepNotes.map(n => n.id === signedNote.id ? signedNote : n));
+    setSelectedNoteForSignature(signedNote);
+    setSelectedNoteForClientPortal(signedNote);
+    setSuccessToast("تم اعتماد التوقيع الإلكتروني وتوثيقه قانونياً وتحديث حالة الملحوظة بنجاح!");
+    setTimeout(() => setSuccessToast(null), 3000);
+  };
+
+  const handleRequestSignatureCompleted = (updatedNote: GoogleKeepNote) => {
+    setKeepNotes(keepNotes.map(n => n.id === updatedNote.id ? updatedNote : n));
+    setSuccessToast(`تم تفعيل وحفظ طلب التوقيع الرقمي للموكل: ${updatedNote.clientName || "الموكل"}`);
+    setTimeout(() => setSuccessToast(null), 3000);
+  };
+
+  const handleCopyConfirmationLink = (note: GoogleKeepNote) => {
+    const link = note.confirmationLink || window.location.origin + window.location.pathname + `?action=sign_memo&memoId=${note.id}`;
+    navigator.clipboard.writeText(link);
+    setSuccessToast("تم نسخ رابط التأكيد القانوني للموكل إلى الحافظة!");
+    setTimeout(() => setSuccessToast(null), 3000);
+  };
+
+  const handleQuickRequestSignature = (note: GoogleKeepNote) => {
+    handleOpenRequestSignatureModal(note);
+  };
+
+  const handleShareSignatureLinkWhatsApp = (note: GoogleKeepNote) => {
+    const clientName = note.clientName || "الموكل الفاضل";
+    const title = note.title;
+    const link = note.confirmationLink || window.location.origin + window.location.pathname + `?action=sign_memo&memoId=${note.id}`;
+    const text = encodeURIComponent(`🏛️ *طلب توقيع وتأكيد إلكتروني قانوني عاجل*
+من: مكتب الأستاذ المحامي المحامي بالنقض والدستورية العليا
+إلى: ${clientName}
+📌 موضوع الملحوظة / الإقرار: "${title}"
+🔗 رابط الاعتماد والتوقيع الرقمي:
+${link}
+
+⚖️ يرجى فتح الرابط ووضع توقيعكم وبصمتكم لاعتماده قانونياً وتقديمه لملف الدعوى.`);
+    window.open(`https://wa.me/${note.clientPhone ? note.clientPhone.replace(/\D/g, '') : ''}?text=${text}`, "_blank");
   };
 
   // ==========================================
@@ -388,14 +528,14 @@ export default function GoogleWorkspaceHub({
       const formattedHtml = `
         <div dir="rtl" style="font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.7; color: #1e293b; padding: 15px; border: 1px solid #e2e8f0; border-radius: 12px;">
           <div style="border-bottom: 2px solid #d97706; padding-bottom: 10px; margin-bottom: 15px;">
-            <h3 style="color: #78350f; margin: 0;">مكتب الأستاذ وسام حمدي الشناوي المحامي بالنقض</h3>
+            <h3 style="color: #78350f; margin: 0;">مكتب الأستاذ المحامي المحامي بالنقض</h3>
             <p style="font-size: 12px; color: #64748b; margin: 3px 0 0 0;">إشعار قضائي رسمي ورسالة إلكترونية موثقة</p>
           </div>
           <div style="font-size: 14px; white-space: pre-line;">
             ${composeBody}
           </div>
           <div style="margin-top: 25px; padding-top: 10px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8;">
-            تم إرسال هذا البريد عبر المنظومة السحابية المعتمدة لمكتب الأستاذ وسام الشناوي - هاتف: 01283233555
+            تم إرسال هذا البريد عبر المنظومة السحابية المعتمدة لمكتب الأستاذ المحامي - هاتف: 01283233555
           </div>
         </div>
       `;
@@ -904,31 +1044,81 @@ export default function GoogleWorkspaceHub({
         </div>
       )}
 
+      {/* Toast Notification */}
+      {successToast && (
+        <div className="fixed bottom-6 left-6 z-50 p-4 bg-slate-900 text-white rounded-2xl shadow-2xl border border-amber-500/40 flex items-center gap-3 animate-in slide-in-from-bottom-5 duration-200">
+          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+          <span className="text-xs font-bold">{successToast}</span>
+        </div>
+      )}
+
       {/* ======================================================== */}
-      {/* 3. GOOGLE KEEP TAB VIEW                                  */}
+      {/* 3. GOOGLE KEEP & ELECTRONIC SIGNATURE TAB VIEW            */}
       {/* ======================================================== */}
       {activeSubTab === "keep" && (
         <div className="space-y-6">
+          
+          {/* Top Summary & Filter Statistics Bar */}
+          <div className="p-5 bg-gradient-to-r from-amber-900 via-slate-900 to-slate-900 text-white rounded-3xl border border-amber-700/30 shadow-xl flex flex-wrap items-center justify-between gap-4">
+            <div className="space-y-1 max-w-xl">
+              <div className="flex items-center gap-2">
+                <Bookmark className="w-5 h-5 text-amber-400" />
+                <h3 className="text-sm font-black">منظومة مذكرات وملاحظات Google Keep والتوقيع الإلكتروني</h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                  قانون التوقيع الإلكتروني رقم 15 لسنة 2004
+                </span>
+              </div>
+              <p className="text-xs text-amber-100/80 leading-relaxed">
+                تدوين المذكرات والملحوظات القانونية مع إمكانية طلب <strong>توقيع وتأكيد إلكتروني ملزم</strong> من الموكل، ومتابعة حالة التوقيع الرقمي، واستخراج شهادات التوثيق القضائية.
+              </p>
+            </div>
+
+            {/* Quick Metrics */}
+            <div className="flex items-center gap-2 text-xs">
+              <div className="bg-white/10 px-3.5 py-2 rounded-2xl border border-white/10 text-center">
+                <span className="block text-[10px] text-slate-300">إجمالي الملاحظات</span>
+                <span className="font-mono font-black text-white text-sm">{keepNotes.length}</span>
+              </div>
+
+              <div className="bg-amber-500/20 px-3.5 py-2 rounded-2xl border border-amber-500/30 text-center">
+                <span className="block text-[10px] text-amber-200">بانتظار توقيع الموكل</span>
+                <span className="font-mono font-black text-amber-400 text-sm">
+                  {keepNotes.filter(n => n.requiresSignature && n.signatureStatus === "pending").length}
+                </span>
+              </div>
+
+              <div className="bg-emerald-500/20 px-3.5 py-2 rounded-2xl border border-emerald-500/30 text-center">
+                <span className="block text-[10px] text-emerald-200">موقعة ومعتمدة</span>
+                <span className="font-mono font-black text-emerald-400 text-sm">
+                  {keepNotes.filter(n => n.signatureStatus === "signed").length}
+                </span>
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
             
-            {/* Create Memo Form */}
+            {/* Create Memo Form with E-Signature Checkbox */}
             <div className="lg:col-span-4 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 space-y-4 shadow-xs">
-              <div className="flex items-center gap-2 pb-2 border-b border-slate-100 dark:border-slate-800">
-                <Bookmark className="w-5 h-5 text-amber-500" />
-                <h3 className="text-xs font-black text-slate-900 dark:text-white">تدوين ملاحظة قضائية (Google Keep)</h3>
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+                <h3 className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-2">
+                  <Bookmark className="w-4 h-4 text-amber-500" />
+                  <span>تدوين ملاحظة / طلب تأكيد قانوني</span>
+                </h3>
+                <span className="text-[10px] text-slate-400 font-mono">Google Keep</span>
               </div>
 
               <form onSubmit={handleAddKeepNote} className="space-y-3 text-xs">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    عنوان المذكرة:
+                    عنوان الملحوظة / الإقرار:
                   </label>
                   <input
                     type="text"
                     value={newNoteTitle}
                     onChange={(e) => setNewNoteTitle(e.target.value)}
-                    placeholder="ملاحظات المرافعة في دعوى التعويض..."
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none focus:ring-1 focus:ring-amber-500 text-right"
+                    placeholder="إقرار استلام مستندات / موافقة على الصلح..."
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none focus:ring-1 focus:ring-amber-500 text-right font-bold"
                     required
                   />
                 </div>
@@ -942,94 +1132,373 @@ export default function GoogleWorkspaceHub({
                     onChange={(e) => setNewNoteTag(e.target.value)}
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none text-right"
                   >
+                    <option value="تأكيد قانوني وتوقيع">تأكيد قانوني وتوقيع إلكتروني</option>
                     <option value="مذكرة قضائية">مذكرة قضائية</option>
                     <option value="تنبيهات الجلسة">تنبيهات الجلسة</option>
-                    <option value="أدلة وشهود">أدلة وشهود</option>
-                    <option value="توثيق وشهر عقاري">توثيق وشهر عقاري</option>
+                    <option value="استلام مستندات">استلام مستندات وأوراق</option>
+                    <option value="صلح وتفويض">صلح وتفويض رسمي</option>
                     <option value="أتعاب ورسوم">أتعاب ورسوم</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    نص الملاحظة القانونية:
+                    نص الملاحظة أو التوجيه القانوني:
                   </label>
                   <textarea
                     value={newNoteContent}
                     onChange={(e) => setNewNoteContent(e.target.value)}
-                    rows={5}
-                    placeholder="التأكيد على تقديم أصل حافظة المستندات وطلب استدعاء الخبير المنتدب..."
+                    rows={4}
+                    placeholder="تفاصيل الملحوظة والتوجيه القانوني المطلوب تأكيده..."
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 outline-none focus:ring-1 focus:ring-amber-500 text-right leading-relaxed"
                     required
                   />
                 </div>
 
+                {/* E-Signature Option Checkbox */}
+                <div className="p-3.5 bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-2xl space-y-3">
+                  <label className="flex items-start gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={requireSignatureOnNewNote}
+                      onChange={(e) => setRequireSignatureOnNewNote(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded text-amber-600 focus:ring-amber-500 accent-amber-600 cursor-pointer"
+                    />
+                    <div className="space-y-0.5">
+                      <span className="text-[11px] font-black text-amber-950 dark:text-amber-200 flex items-center gap-1">
+                        <PenTool className="w-3.5 h-3.5 text-amber-600" />
+                        <span>طلب 'توقيع إلكتروني' وتأكيد قانوني من الموكل</span>
+                      </span>
+                      <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-tight">
+                        إلزام الموكل بوضع توقيعه الرقمي وبصمته للتأكيد الرسمي على مضمون الملحوظة.
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* Sub-inputs when E-Signature is checked */}
+                  {requireSignatureOnNewNote && (
+                    <div className="space-y-2.5 pt-2 border-t border-amber-200/80 dark:border-amber-900/40 animate-in fade-in duration-150">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          الموكل المعني بالتوقيع:
+                        </label>
+                        <select
+                          value={selectedClientForNote}
+                          onChange={(e) => setSelectedClientForNote(e.target.value)}
+                          className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-right outline-none font-bold"
+                        >
+                          <option value="">-- اختر الموكل من السجل --</option>
+                          {clients.map((cl) => (
+                            <option key={cl.id} value={cl.id}>
+                              {cl.name} ({cl.phone || "بدون هاتف"})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          رقم القضية المرتبطة (اختياري):
+                        </label>
+                        <select
+                          value={selectedCaseForNote}
+                          onChange={(e) => setSelectedCaseForNote(e.target.value)}
+                          className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-right outline-none"
+                        >
+                          <option value="">-- اختر القضية --</option>
+                          {cases.map((cs) => (
+                            <option key={cs.id} value={`${cs.caseNumber} لسنة ${cs.caseYear} - ${cs.competentCourt}`}>
+                              {cs.caseNumber} لسنة {cs.caseYear} ({cs.clientName})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          نص الإقرار والتأكيد القانوني المخصص:
+                        </label>
+                        <input
+                          type="text"
+                          value={customAffirmation}
+                          onChange={(e) => setCustomAffirmation(e.target.value)}
+                          placeholder="أقر بصفتي الموكل بصحة البيانات والموافقة على خطة الدفاع..."
+                          className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-right outline-none"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <button
                   type="submit"
-                  className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl shadow-sm flex items-center justify-center gap-1.5 cursor-pointer transition"
+                  className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5 cursor-pointer transition"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>حفظ المذكرة في Google Keep</span>
+                  <span>{requireSignatureOnNewNote ? "حفظ وإرسال طلب التوقيع الإلكتروني" : "حفظ المذكرة في Google Keep"}</span>
                 </button>
               </form>
             </div>
 
-            {/* Notes List Column */}
+            {/* Notes List with Status Filter & E-Signature Actions */}
             <div className="lg:col-span-8 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 space-y-4 shadow-xs">
-              <div className="flex items-center justify-between gap-3">
-                <div className="relative flex-1">
+              
+              {/* Search & Filter Toolbar */}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="relative flex-1 min-w-[200px]">
                   <Search className="w-4 h-4 absolute right-3 top-2.5 text-slate-400" />
                   <input
                     type="text"
                     value={keepSearch}
                     onChange={(e) => setKeepSearch(e.target.value)}
-                    placeholder="بحث في الملاحظات والمذكرات القضائية..."
-                    className="w-full pl-3 pr-9 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-right outline-none"
+                    placeholder="بحث في الملاحظات والمذكرات القضائية أو اسم الموكل..."
+                    className="w-full pl-3 pr-9 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-right outline-none focus:ring-1 focus:ring-amber-500"
                   />
                 </div>
-                <span className="text-xs font-mono font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-3 py-1.5 rounded-xl border border-amber-200 dark:border-amber-800">
-                  {keepNotes.length} مذكرة
-                </span>
+
+                {/* Filter Badges */}
+                <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
+                  <button
+                    onClick={() => setFilterSignatureStatus("all")}
+                    className={`px-3 py-1.5 rounded-xl font-bold transition cursor-pointer ${
+                      filterSignatureStatus === "all"
+                        ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
+                        : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+                    }`}
+                  >
+                    الكل ({keepNotes.length})
+                  </button>
+
+                  <button
+                    onClick={() => setFilterSignatureStatus("pending")}
+                    className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1 cursor-pointer ${
+                      filterSignatureStatus === "pending"
+                        ? "bg-amber-500 text-slate-950 font-black shadow-xs"
+                        : "bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200/60 dark:border-amber-900/40"
+                    }`}
+                  >
+                    <Clock className="w-3 h-3 text-amber-600" />
+                    <span>بانتظار التوقيع ({keepNotes.filter(n => n.requiresSignature && n.signatureStatus === "pending").length})</span>
+                  </button>
+
+                  <button
+                    onClick={() => setFilterSignatureStatus("signed")}
+                    className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1 cursor-pointer ${
+                      filterSignatureStatus === "signed"
+                        ? "bg-emerald-600 text-white font-black shadow-xs"
+                        : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-900/40"
+                    }`}
+                  >
+                    <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                    <span>موقعة ومعتمدة ({keepNotes.filter(n => n.signatureStatus === "signed").length})</span>
+                  </button>
+                </div>
               </div>
 
+              {/* Notes Grid */}
               {keepNotes.length === 0 ? (
                 <div className="p-12 text-center text-xs text-slate-400 space-y-2">
                   <Bookmark className="w-10 h-10 text-slate-300 mx-auto" />
                   <p>لا توجد ملاحظات أو مذكرات مسجلة.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 max-h-[500px] overflow-y-auto pr-1">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 max-h-[560px] overflow-y-auto pr-1">
                   {keepNotes
-                    .filter(n => !keepSearch || n.title.includes(keepSearch) || n.content.includes(keepSearch))
-                    .map((note) => (
-                      <div
-                        key={note.id}
-                        className="p-4 bg-amber-50/40 dark:bg-slate-850 rounded-2xl border border-amber-200/60 dark:border-slate-750 text-right space-y-2 flex flex-col justify-between"
-                      >
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-black text-slate-900 dark:text-slate-100">{note.title}</span>
-                            <button
-                              onClick={() => handleDeleteKeepNote(note.id)}
-                              className="text-slate-400 hover:text-red-500 transition p-1 cursor-pointer"
-                              title="حذف المذكرة"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                          <p className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
-                            {note.content}
-                          </p>
-                        </div>
+                    .filter(n => {
+                      const matchQuery =
+                        !keepSearch ||
+                        n.title.toLowerCase().includes(keepSearch.toLowerCase()) ||
+                        n.content.toLowerCase().includes(keepSearch.toLowerCase()) ||
+                        (n.clientName && n.clientName.toLowerCase().includes(keepSearch.toLowerCase()));
 
-                        <div className="flex items-center justify-between pt-2 border-t border-amber-100 dark:border-slate-800 text-[10px] text-slate-400">
-                          <span className="bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-md font-bold">
-                            {note.tags?.[0] || "مذكرة"}
-                          </span>
-                          <span className="font-mono">{new Date(note.date).toLocaleDateString("ar-EG")}</span>
+                      if (!matchQuery) return false;
+
+                      if (filterSignatureStatus === "requires_sig") return !!n.requiresSignature;
+                      if (filterSignatureStatus === "pending") return n.requiresSignature && n.signatureStatus === "pending";
+                      if (filterSignatureStatus === "signed") return n.signatureStatus === "signed";
+                      return true;
+                    })
+                    .map((note) => {
+                      const isSigned = note.signatureStatus === "signed";
+                      const isPending = note.requiresSignature && note.signatureStatus === "pending";
+
+                      return (
+                        <div
+                          key={note.id}
+                          className={`p-4 rounded-3xl border text-right space-y-3 flex flex-col justify-between transition-all hover:shadow-md ${
+                            isSigned
+                              ? "bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-300/80 dark:border-emerald-900/50"
+                              : isPending
+                              ? "bg-amber-50/60 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800/60"
+                              : "bg-slate-50/60 dark:bg-slate-850 border-slate-200 dark:border-slate-750"
+                          }`}
+                        >
+                          <div className="space-y-2">
+                            {/* Card Top: Title & Delete */}
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="space-y-1 flex-1">
+                                <span className="text-xs font-black text-slate-900 dark:text-slate-100 block leading-snug">
+                                  {note.title}
+                                </span>
+                                {note.caseNumber && (
+                                  <span className="text-[10px] text-slate-500 font-mono block">
+                                    دعوى: {note.caseNumber}
+                                  </span>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => handleDeleteKeepNote(note.id)}
+                                className="text-slate-400 hover:text-red-500 transition p-1 cursor-pointer shrink-0"
+                                title="حذف المذكرة"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+
+                            {/* Content Preview */}
+                            <p className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
+                              {note.content}
+                            </p>
+
+                            {/* Electronic Signature Status Badge in Lawyer Interface */}
+                            {note.requiresSignature && (
+                              <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                                {isSigned && note.signatureData ? (
+                                  <div className="p-2.5 bg-emerald-100/60 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 rounded-2xl space-y-1.5">
+                                    <div className="flex items-center justify-between text-[11px]">
+                                      <span className="font-black text-emerald-900 dark:text-emerald-300 flex items-center gap-1">
+                                        <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                                        <span>توقيع إلكتروني معتمد وموثق</span>
+                                      </span>
+                                      <span className="text-[9px] font-mono bg-emerald-200/80 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-200 px-2 py-0.5 rounded-full font-bold">
+                                        {note.signatureData.verificationHash?.substring(0, 14)}...
+                                      </span>
+                                    </div>
+
+                                    <div className="flex items-center justify-between text-[10px] text-emerald-800 dark:text-emerald-300 font-medium">
+                                      <span>الموكل: {note.signatureData.signedBy}</span>
+                                      <span className="font-mono">
+                                        {new Date(note.signatureData.signedAt).toLocaleDateString("ar-EG")}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ) : isPending ? (
+                                  <div className="p-2.5 bg-amber-100/70 dark:bg-amber-950/70 border border-amber-300 dark:border-amber-800 rounded-2xl space-y-1.5">
+                                    <div className="flex items-center justify-between text-[11px]">
+                                      <span className="font-black text-amber-950 dark:text-amber-200 flex items-center gap-1">
+                                        <Clock className="w-3.5 h-3.5 text-amber-600 animate-spin" />
+                                        <span>بانتظار التوقيع الإلكتروني من الموكل</span>
+                                      </span>
+                                      <span className="text-[9px] bg-amber-200 dark:bg-amber-900 text-amber-950 dark:text-amber-200 px-2 py-0.5 rounded-full font-bold">
+                                        تأكيد مطلوب
+                                      </span>
+                                    </div>
+
+                                    {note.clientName && (
+                                      <div className="text-[10px] text-amber-900 dark:text-amber-300 font-bold">
+                                        الموكل المعني: {note.clientName}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : null}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Card Footer & Interactive Action Buttons */}
+                          <div className="pt-2 border-t border-slate-200/50 dark:border-slate-800 space-y-2">
+                            <div className="flex items-center justify-between text-[10px] text-slate-400">
+                              <span className="bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-md font-bold">
+                                {note.tags?.[0] || "مذكرة"}
+                              </span>
+                              <span className="font-mono">{new Date(note.date).toLocaleDateString("ar-EG")}</span>
+                            </div>
+
+                            {/* Signature Action Buttons */}
+                            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                              {isSigned ? (
+                                <>
+                                  <button
+                                    onClick={() => handleOpenSignatureModal(note)}
+                                    className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-black flex items-center justify-center gap-1 transition cursor-pointer shadow-xs"
+                                  >
+                                    <ShieldCheck className="w-3.5 h-3.5" />
+                                    <span>معاينة شهادة التوقيع</span>
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleOpenClientPortal(note)}
+                                    className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950 text-slate-700 dark:text-slate-300 rounded-xl transition cursor-pointer"
+                                    title="فتح بوابة التأكيد الرسمية"
+                                  >
+                                    <FileCheck2 className="w-3.5 h-3.5 text-emerald-600" />
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleCopyConfirmationLink(note)}
+                                    className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 rounded-xl transition cursor-pointer"
+                                    title="نسخ رابط التوثيق"
+                                  >
+                                    <Copy className="w-3.5 h-3.5" />
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleShareSignatureLinkWhatsApp(note)}
+                                    className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition cursor-pointer"
+                                    title="مشاركة عبر واتساب"
+                                  >
+                                    <Share2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </>
+                              ) : isPending ? (
+                                <>
+                                  <button
+                                    onClick={() => handleOpenRequestSignatureModal(note)}
+                                    className="flex-1 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-[11px] font-black flex items-center justify-center gap-1 transition cursor-pointer shadow-xs"
+                                  >
+                                    <Link2 className="w-3.5 h-3.5" />
+                                    <span>إرسال رابط التأكيد للموكل</span>
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleOpenClientPortal(note)}
+                                    className="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 text-amber-700 dark:text-amber-300 rounded-xl text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
+                                    title="توقيع الموكل الآن"
+                                  >
+                                    <PenTool className="w-3.5 h-3.5" />
+                                    <span>توقيع</span>
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleCopyConfirmationLink(note)}
+                                    className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 rounded-xl transition cursor-pointer"
+                                    title="نسخ رابط التأكيد القانوني"
+                                  >
+                                    <Copy className="w-3.5 h-3.5" />
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleShareSignatureLinkWhatsApp(note)}
+                                    className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition cursor-pointer"
+                                    title="إرسال طلب التوقيع للموكل عبر واتساب"
+                                  >
+                                    <Share2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  onClick={() => handleOpenRequestSignatureModal(note)}
+                                  className="w-full py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/40 text-slate-700 dark:text-slate-300 hover:text-amber-600 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1 transition cursor-pointer"
+                                >
+                                  <PenTool className="w-3 h-3 text-amber-500" />
+                                  <span>طلب توقيع رقمي وإرسال رابط للموكل</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                 </div>
               )}
             </div>
@@ -1379,6 +1848,54 @@ export default function GoogleWorkspaceHub({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Electronic Signature Modal */}
+      {isSignatureModalOpen && selectedNoteForSignature && (
+        <ElectronicSignatureModal
+          note={selectedNoteForSignature}
+          currentUser={currentUser}
+          isOpen={isSignatureModalOpen}
+          onClose={() => {
+            setIsSignatureModalOpen(false);
+            setSelectedNoteForSignature(null);
+          }}
+          onSignComplete={handleSignCompleted}
+        />
+      )}
+
+      {/* Request Signature & Shareable Confirmation Link Modal */}
+      {isRequestLinkModalOpen && selectedNoteForRequestLink && (
+        <RequestSignatureLinkModal
+          note={selectedNoteForRequestLink}
+          currentUser={currentUser}
+          clients={clients}
+          cases={cases}
+          isOpen={isRequestLinkModalOpen}
+          onClose={() => {
+            setIsRequestLinkModalOpen(false);
+            setSelectedNoteForRequestLink(null);
+          }}
+          onRequestCompleted={handleRequestSignatureCompleted}
+          onOpenClientSigningView={(targetNote) => {
+            setIsRequestLinkModalOpen(false);
+            setSelectedNoteForRequestLink(null);
+            handleOpenClientPortal(targetNote);
+          }}
+        />
+      )}
+
+      {/* Client Signature Confirmation Portal (Simulated Client View) */}
+      {isClientPortalOpen && selectedNoteForClientPortal && (
+        <ClientSignatureConfirmationPortal
+          note={selectedNoteForClientPortal}
+          isOpen={isClientPortalOpen}
+          onClose={() => {
+            setIsClientPortalOpen(false);
+            setSelectedNoteForClientPortal(null);
+          }}
+          onSignComplete={handleSignCompleted}
+        />
       )}
 
     </div>

@@ -17,7 +17,7 @@ import {
   Building,
   ExternalLink,
   Filter,
-  Layers
+  Layers, Mic, MicOff
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { 
@@ -77,7 +77,30 @@ export default function GlobalSearchView({
   const [query, setQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState<string>("all");
   const [extractedFileIndex, setExtractedFileIndex] = useState<{ id: string; name: string; type: string; text: string; section: string; parentTitle: string }[]>([]);
+  const [isListening, setIsListening] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleVoiceSearch = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      alert('عذراً، متصفحك لا يدعم البحث الصوتي.');
+      return;
+    }
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'ar-EG';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onstart = () => setIsListening(true);
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setQuery(transcript);
+      setIsListening(false);
+    };
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
+    recognition.start();
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -452,15 +475,23 @@ export default function GlobalSearchView({
               <Search className="w-5 h-5" />
             </div>
             
-            <div className="flex-1">
+            <div className="flex-1 flex items-center gap-2">
               <input
                 ref={inputRef}
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="ابحث في كامل المنونة: القضايا، الموكلين، الجلسات، ملفات Word/Excel، صور الـ OCR، المحاضر، الأتعاب، مواد القانون..."
+                placeholder="ابحث في كامل المنونة: القضايا، الموكلين..."
                 className="w-full bg-transparent text-slate-900 dark:text-slate-100 placeholder-slate-400 text-sm sm:text-base font-bold outline-none text-right"
               />
+              <button 
+                type="button"
+                onClick={handleVoiceSearch}
+                className={`p-2 rounded-xl transition cursor-pointer ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-slate-200 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}
+                title="البحث الصوتي"
+              >
+                {isListening ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+              </button>
             </div>
 
             {query && (
@@ -588,7 +619,7 @@ export default function GlobalSearchView({
 
         {/* Footer info */}
         <div className="p-3 bg-slate-100 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center text-[11px] text-slate-500 px-5">
-          <span>نظام الفهرسة والبحث الشامل لمكتب الأستاذ وسام الشناوي</span>
+          <span>نظام الفهرسة والبحث الشامل لمكتب الأستاذ المحامي</span>
           <span>اختصار سريع: اضغط <kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-800 border rounded font-mono font-bold">Ctrl + K</kbd> من أي مكان</span>
         </div>
 
