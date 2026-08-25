@@ -1,9 +1,155 @@
 export enum UserRole {
-  ADMIN = "admin",       // الأستاذ الكبير وسام الشناوي
-  STAFF = "staff",       // السكرتارية والمحامين بالمكتب
-  CLIENT = "client",     // الموكلون المسجلون
-  SEEKER = "seeker",     // طالب الخدمة / استشارة قانونية
-  OPPONENT = "opponent"  // خصم مسجل
+  ADMIN = "admin",             // الأستاذ الكبير وسام الشناوي (مدير النظام والمكتب)
+  SENIOR_LAWYER = "senior_lawyer", // محامي أول / شريك
+  ASSOCIATE_LAWYER = "associate_lawyer", // محامي جدول عام / ابتدائي / استئناف
+  SECRETARY = "secretary",     // السكرتارية والشؤون الإدارية
+  ACCOUNTANT = "accountant",   // المحاسب المالي وشؤون الخزينة
+  TRAINEE = "trainee",         // محامي متدرب / باحث قانوني
+  STAFF = "staff",             // طاقم العمل العام
+  CLIENT = "client",           // الموكلون المسجلون
+  SEEKER = "seeker",           // طالب الخدمة / استشارة قانونية
+  OPPONENT = "opponent"        // خصم مسجل
+}
+
+export interface UserPermissions {
+  // القضايا والدعاوى
+  canViewCases: boolean;
+  canAddCases: boolean;
+  canEditCases: boolean;
+  canDeleteCases: boolean;
+  canExportCases: boolean;
+  
+  // الموكلين وجهات الاتصال
+  canViewClients: boolean;
+  canAddClients: boolean;
+  canEditClients: boolean;
+  canDeleteClients: boolean;
+  canViewOpponents: boolean;
+  
+  // الخزينة والأتعاب
+  canViewFinance: boolean;
+  canAddPayments: boolean;
+  canEditFees: boolean;
+  canViewFinancialReports: boolean;
+  
+  // الأجندة والجلسات
+  canManageSessions: boolean;
+  canRecordDecisions: boolean;
+  
+  // الأدوات والمحرر والـ OCR و Google Workspace
+  canAccessDocEditor: boolean;
+  canAccessSmartOcr: boolean;
+  canSignMemos: boolean;
+  canAccessGoogleWorkspace: boolean;
+  
+  // التحكم في البرنامج والإدارة
+  canManageSections: boolean;
+  canManageUsers: boolean;
+  canManageDevices: boolean;
+  canViewAuditLogs: boolean;
+  canEditSystemSettings: boolean;
+  canEditApp?: boolean;
+  canAddSections?: boolean;
+  canDeleteSections?: boolean;
+}
+
+export interface License {
+  id: string;
+  licenseKey?: string;
+  holderName: string;
+  holderPhone: string;
+  maxDevices: number;
+  maxUsers: number;
+  approvedDevices?: string[];
+  issuedAt?: string;
+  createdAt?: string;
+  expiresAt?: string;
+  status: "active" | "suspended" | "expired";
+  devicesUsed?: number;
+  activeDevices?: string[];
+}
+
+export interface EmailNotificationRecord {
+  id: string;
+  to?: string;
+  toEmail?: string;
+  recipientEmail?: string;
+  recipientName?: string;
+  subject?: string;
+  body?: string;
+  title?: string;
+  message?: string;
+  updateType?: string;
+  sessionDate?: string;
+  courtName?: string;
+  sentBy?: string;
+  sentAt: string;
+  status: "sent" | "failed" | "pending";
+  caseId?: string;
+  caseNumber?: string;
+  caseYear?: number;
+  clientName?: string;
+  metadata?: any;
+}
+
+export interface ConnectedDeviceRecord {
+  deviceId: string;
+  deviceName: string;
+  deviceType: "desktop" | "mobile" | "tablet" | "laptop";
+  os: string;
+  browser: string;
+  ipAddress?: string;
+  location?: string;
+  firstLogin: string;
+  lastLogin: string;
+  isCurrentDevice?: boolean;
+  isTrusted?: boolean;
+  isBlocked?: boolean;
+  hardwareFingerprint?: string;
+}
+
+export interface SecurityAuditLog {
+  id: string;
+  timestamp: string;
+  userId: string;
+  userName: string;
+  userRole: string;
+  action: "login" | "logout" | "failed_login" | "device_revoked" | "permission_change" | "user_created" | "user_suspended" | "password_reset" | "section_toggle" | "export_data" | "device_blocked";
+  details: string;
+  deviceId?: string;
+  deviceName?: string;
+  ipAddress?: string;
+  severity: "info" | "warning" | "danger" | "success";
+}
+
+export interface ProgramModuleConfig {
+  id: string;
+  nameArabic: string;
+  nameEnglish: string;
+  description: string;
+  category: "core" | "legal" | "finance" | "ai_tools" | "communication" | "custom";
+  iconName: string;
+  emoji: string;
+  isEnabled: boolean;
+  allowedRoles: UserRole[];
+  order: number;
+  badge?: string;
+  isCore?: boolean;
+}
+
+export interface OfficeDepartment {
+  id: string;
+  name: string;
+  code: string;
+  description?: string;
+  headLawyerName?: string;
+  headLawyerPhone?: string;
+  assignedLawyers: string[];
+  casesCount?: number;
+  color: string;
+  icon: string;
+  status: "active" | "archived";
+  createdAt: string;
 }
 
 export interface PlatformUser {
@@ -17,26 +163,34 @@ export interface PlatformUser {
   googleAccount?: string;
   facebookAccount?: string;
   whatsAppAccount?: string;
+  status?: "active" | "suspended" | "pending"; // حالة الحساب
+  officeId?: string;     // معرف مكتب المحاماة (SaaS Tenant ID)
+
+  // Registration & Validation
+  nationalIdFront?: string; // صورة بطاقة الرقم القومي (وجه)
+  nationalIdBack?: string;  // صورة بطاقة الرقم القومي (ظهر)
+  lawyerCard?: string;      // صورة كارنيه المحاماة
+  lawFirmPhone?: string;    // رقم هاتف صاحب المكتب (خاص بالموكلين للربط بالمكتب)
   
   // Licensing & Device Management
   maxDevices?: number;         // الحد الأقصى للأجهزة (المتصفحات) المسموحة
   allowedDevices?: string[];   // قائمة بمعرفات الأجهزة المسموحة
-  connectedDevices?: {         // الأجهزة التي سجلت دخول حالياً
-    deviceId: string;
-    deviceName: string;
-    lastLogin: string;
-  }[];
+  connectedDevices?: ConnectedDeviceRecord[]; // الأجهزة التي سجلت دخول حالياً
+  lockToSingleDevice?: boolean; // قفل الحساب على جهاز واحد موثوق فقط
+  trustedDeviceId?: string;     // معرف الجهاز الموثوق الوحيد
   mergedWithAccountId?: string; // في حالة دمج هذا الحساب مع حساب آخر
   assignedSerialNumber?: string; // سيريال نمبر مرتبط بهذا الحساب
-
+  departmentId?: string;        // القسم التابع له في المكتب
+  
   createdAt: string;
-  permissions?: {
-    canEditApp: boolean;
-    canAddSections: boolean;
-  };
+  lastActiveTime?: string;
+  loginCount?: number;
+  permissions?: Partial<UserPermissions>;
+  customPermissions?: Partial<UserPermissions>;
 }
 
 export interface ClientProfile {
+  officeId?: string;
   id: string;            // رقم مسلسل أو معرف فريد
   code?: string;         // كود الموكل الفريد (مثال: CL-2026-0042)
   serialNumber: number;  // رقم مسلسل لمعرفة عدد الموكلين
@@ -83,6 +237,7 @@ export interface ClientProfile {
   remainingFees: number; // باقي الأتعاب
   avatar?: string;       // الصورة الشخصية للموكل
   personalDocuments?: { id: string; name: string; fileBase64: string; addedAt: string }[];
+  status?: "active" | "archived";
   createdAt: string;
 }
 
@@ -106,7 +261,21 @@ export interface LeadProfile {
   source: string; // Google Contacts, Excel, etc.
 }
 
+export interface CaseMilestone {
+  id: string;
+  type: "registered" | "first_session" | "judgment" | "appeal" | "custom";
+  title: string;
+  titleEn?: string;
+  date: string;
+  status: "completed" | "in_progress" | "upcoming" | "pending";
+  decisionOrNotes?: string;
+  circuitOrCourt?: string;
+  appealNumber?: string;
+  completedAt?: string;
+}
+
 export interface CaseRecord {
+  officeId?: string;
   id: string;
   code?: string;        // كود القضية الفريد (مثال: CS-2026-0095)
   serialNumber: number; // رقم مسلسل لمعرفة عدد القضايا
@@ -129,6 +298,9 @@ export interface CaseRecord {
     maxUsd: string;
     recommendation: string;
   };
+  timeline?: CaseMilestone[]; // محطات ومراحل التقاضي التفاعلية
+  stage?: "registered" | "first_session" | "judgment" | "appeal" | "closed";
+  status?: "active" | "archived";
   createdAt: string;
 }
 
@@ -222,21 +394,122 @@ export interface LawCodeBook {
   fileName?: string;
 }
 
-export interface EmailNotificationRecord {
+export interface LegalTemplate {
   id: string;
-  toEmail: string;
-  clientName: string;
+  title: string;
+  category: "defense_memo" | "claim_statement" | "contract" | "appeal" | "notice" | "poa_agreement";
+  categoryArabic: string;
+  description: string;
+  badge?: string;
+  tags: string[];
+  contentTemplate: string;
+  defaultCourtType?: string;
+  customFields?: { key: string; label: string; defaultValue?: string; placeholder?: string }[];
+}
+
+export interface DocumentVersion {
+  id: string;
+  dataUrl: string;
+  size: string;
+  uploadedAt: string;
+  uploadedBy: string;
+}
+
+export interface SystemAttachment {
+  id: string;
+  name: string;
+  type: "pdf" | "word" | "image" | "excel" | "scan" | "archive" | "other";
+  size: string;
+  dataUrl?: string;
+  versions?: DocumentVersion[];
+  category: "power_of_attorney" | "claim_statement" | "judgment" | "expert_report" | "national_id" | "evidence" | "defense_memo" | "receipt" | "contract" | "other";
+  categoryArabic: string;
   caseId?: string;
   caseNumber?: string;
   caseYear?: number;
-  courtName?: string;
-  title: string;
-  message: string;
-  updateType: "case_status_update" | "session_update" | "decision_recorded" | "general_legal_notice";
-  sessionDate?: string;
-  decision?: string;
-  status: "sent" | "delivered" | "failed";
+  clientId?: string;
+  clientName?: string;
+  uploadedBy: string;
+  uploadedAt: string;
+  notes?: string;
+  tags?: string[];
+}
+
+export interface SentWhatsAppAlertRecord {
+  id: string;
+  clientId?: string;
+  clientName: string;
+  phone: string;
+  messageType: "session_reminder" | "documents_request" | "judgment_alert" | "signature_request" | "fee_reminder" | "custom";
+  messageText: string;
   sentAt: string;
-  sentBy?: string;
+  caseNumber?: string;
+  status: "sent" | "opened";
+}
+
+
+export interface BiometricSignatureTelemetry {
+  pointCount: number;
+  strokeCount: number;
+  durationMs: number;
+  averagePressure: number;
+  peakPressure: number;
+  pressureVariance: number;
+  averageSpeed: number; // px/ms
+  peakSpeed: number;
+  boundingWidth: number;
+  boundingHeight: number;
+  devicePointerType: "pen" | "touch" | "mouse" | "stylus" | string;
+  hardwarePressureSupported: boolean;
+  behavioralFingerprint: string;
+  calculatedAt: string;
+  evidentiaryScore: number;
+}
+
+export interface NoteSignatureData {
+  signedBy: string;
+  nationalId?: string;
+  signedAt: string;
+  signatureImage?: string; // Data URL of signature (High-Res Transparent PNG)
+  signatureVectorSvg?: string; // Scalable Vector Graphics Path (SVG)
+  signatureType?: "drawn" | "digital_badge";
+  verificationHash?: string;
+  digitalStamp?: string;
+  lawyerSignatureName?: string;
+  ipOrDeviceId?: string;
+  notes?: string;
+  biometricTelemetry?: BiometricSignatureTelemetry;
+  behavioralFingerprint?: string;
+}
+
+export interface ClientNote {
+  id: string;
+  clientName: string;
+  text: string;
+  date: string;
+  priority?: "High" | "Normal" | "Low";
+  category?: "Legal Document" | "Consultation" | "Fee Inquiry" | "Scheduling" | string;
+  linkedAttachments?: { id: string; name: string; url: string }[];
+  status?: "Pending" | "Read by Attorney" | "Acknowledged";
+  scheduledReminder?: boolean;
+  referencedCaseId?: string;
+  attorneyReply?: string;
+  // Digital signature features
+  requiresSignature?: boolean;
+  signatureStatus?: "none" | "pending" | "signed" | "rejected";
+  signatureRequestedBy?: "lawyer" | "client";
+  signatureRequestedAt?: string;
+  confirmationToken?: string;
+  confirmationLink?: string;
+  clientPhone?: string;
+  legalAffirmation?: string;
+  signatureData?: NoteSignatureData;
+  signatureHistory?: {
+    timestamp: string;
+    action: string;
+    performedBy: string;
+    status: "none" | "pending" | "signed" | "rejected";
+    notes?: string;
+  }[];
 }
 

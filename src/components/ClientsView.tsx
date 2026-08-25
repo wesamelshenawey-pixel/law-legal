@@ -1,7 +1,8 @@
-import React, { useState } from "react";
-import { ClientProfile, OpponentProfile, LeadProfile, PlatformUser, UserRole, CaseRecord } from "../types";
+import React, { useState, useMemo } from "react";
+import { ClientProfile, OpponentProfile, LeadProfile, PlatformUser, UserRole, CaseRecord, FeeTransfer } from "../types";
 import { INITIAL_COURTS } from "../utils/staticData";
 import AddClientWizardModal from "./AddClientWizardModal";
+import PhoneInputWithCountry from "./PhoneInputWithCountry";
 import { 
   Users, 
   Settings, 
@@ -20,7 +21,12 @@ import {
   Globe,
   Contact,
   RefreshCw,
-  UserPlus
+  UserPlus,
+  DollarSign,
+  TrendingUp,
+  Coins,
+  ShieldCheck,
+  Award
 } from "lucide-react";
 import { 
   getStoredWorkspaceToken, 
@@ -35,6 +41,7 @@ interface ClientsViewProps {
   opponents: OpponentProfile[];
   leads: LeadProfile[];
   registeredUsers: PlatformUser[];
+  fees?: FeeTransfer[];
   onAddClient: (newCl: ClientProfile, firstCase?: CaseRecord) => void;
   onAddOpponent: (opp: OpponentProfile) => void;
   onUpdateUserRole: (phone: string, role: string) => void;
@@ -45,6 +52,7 @@ interface ClientsViewProps {
   casesCount?: number;
   onOpenPhoneSync?: () => void;
   onOpenDocumentManager?: (section: string, label: string) => void;
+  onNavigateToOcr?: () => void;
 }
 
 export default function ClientsView({
@@ -52,6 +60,7 @@ export default function ClientsView({
   opponents,
   leads,
   registeredUsers,
+  fees = [],
   onAddClient,
   onAddOpponent,
   onUpdateUserRole,
@@ -61,12 +70,67 @@ export default function ClientsView({
   casesCount,
   currentUser,
   onOpenPhoneSync,
-  onOpenDocumentManager
+  onOpenDocumentManager,
+  onNavigateToOcr
 }: ClientsViewProps) {
   const [activeTab, setActiveTab] = useState<"clients" | "opponents" | "online" | "leads" | "permissions">("clients");
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLeadForConversion, setSelectedLeadForConversion] = useState<LeadProfile | null>(null);
+
+  // Dynamic Client Profitability Map calculated from FeesView data & Client Profiles
+  const clientProfitabilityMap = useMemo(() => {
+    const map: Record<string, { totalPaid: number; pendingBalance: number; totalContract: number; percentage: number; status: "full" | "high" | "pending" | "unpaid" }> = {};
+
+    clients.forEach((c) => {
+      // Find all payments made by this client
+      const clientFees = fees.filter(f => 
+        (f.clientName && f.clientName.trim() === c.name.trim()) ||
+        (f.notes && f.notes.includes(c.name))
+      );
+      
+      const totalPaid = clientFees.reduce((sum, f) => sum + (Number(f.amount) || 0), 0);
+      const pendingBalance = Number(c.remainingFees) || 0;
+      const totalContract = totalPaid + pendingBalance;
+      const percentage = totalContract > 0 ? Math.min(100, Math.round((totalPaid / totalContract) * 100)) : (pendingBalance === 0 ? 100 : 0);
+
+      let status: "full" | "high" | "pending" | "unpaid" = "pending";
+      if (pendingBalance === 0 && totalPaid > 0) {
+        status = "full";
+      } else if (percentage >= 70) {
+        status = "high";
+      } else if (totalPaid === 0 && pendingBalance > 0) {
+        status = "unpaid";
+      } else {
+        status = "pending";
+      }
+
+      map[c.id] = { totalPaid, pendingBalance, totalContract, percentage, status };
+    });
+
+    return map;
+  }, [clients, fees]);
+
+  // Overall Office Profitability Stats
+  const overallProfitability = useMemo(() => {
+    let totalPaidAll = 0;
+    let totalPendingAll = 0;
+
+    Object.values(clientProfitabilityMap).forEach(p => {
+      totalPaidAll += p.totalPaid;
+      totalPendingAll += p.pendingBalance;
+    });
+
+    // If totalPaid is 0 because of demo data mismatch, fallback to direct sum of all fees
+    if (totalPaidAll === 0 && fees.length > 0) {
+      totalPaidAll = fees.reduce((sum, f) => sum + (Number(f.amount) || 0), 0);
+    }
+
+    const totalContractAll = totalPaidAll + totalPendingAll;
+    const overallRate = totalContractAll > 0 ? Math.round((totalPaidAll / totalContractAll) * 100) : 0;
+
+    return { totalPaidAll, totalPendingAll, totalContractAll, overallRate };
+  }, [clientProfitabilityMap, fees]);
 
   // Auto Generate Clients and Opponents (إضافة أسماء موكلين وخصوم تلقائياً)
   const handleAutoGenerateClientsAndOpponents = () => {
@@ -331,12 +395,8 @@ export default function ClientsView({
     <div className="space-y-8 text-right font-sans" dir="rtl">
       
       {/* Title block */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center flex-wrap gap-4">
+      <div className="flex justify-end items-center flex-wrap gap-4 mb-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">منظومة الموكلين والعملاء الموحدة</h2>
-          <p className="text-xs text-slate-500 mt-1">
-            دمج شامل للموكلين، والعملاء، والخصوم، والعملاء الإلكترونيين، وصلاحيات وحسابات المستخدمين مع ربط الحسابات المتقاطعة.
-          </p>
         </div>
 
         <div className="flex gap-2 flex-wrap items-center">
@@ -423,6 +483,51 @@ export default function ClientsView({
         </div>
       )}
 
+      {/* DYNAMIC CLIENT PROFITABILITY & FINANCIAL HEALTH BANNER */}
+      {currentUser.role !== UserRole.CLIENT && (
+        <div className="bg-gradient-to-l from-slate-900 via-slate-850 to-slate-900 border border-amber-500/40 rounded-2xl p-4 text-white shadow-md">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-amber-500 text-slate-950 rounded-xl shadow-inner font-bold">
+                <Coins className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-black text-amber-300">مؤشر ربحية ومستحقات الموكلين (Clients Profitability Index)</h3>
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/40 font-bold">
+                    معدل تحصيل {overallProfitability.overallRate}%
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 mt-0.5">
+                  حساب ديناميكي فوري من جدول الفواتير والأتعاب المسددة والمتبقية في ذمة الموكلين
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 w-full md:w-auto">
+              <div className="bg-slate-800/80 px-3 py-2 rounded-xl border border-slate-700 text-center">
+                <span className="text-[10px] text-slate-400 block font-medium">المحصل فعلياً</span>
+                <span className="text-xs font-black text-emerald-400 font-mono">
+                  {overallProfitability.totalPaidAll.toLocaleString()} EGP
+                </span>
+              </div>
+              <div className="bg-slate-800/80 px-3 py-2 rounded-xl border border-slate-700 text-center">
+                <span className="text-[10px] text-slate-400 block font-medium">المتبقي المطلوب</span>
+                <span className="text-xs font-black text-amber-400 font-mono">
+                  {overallProfitability.totalPendingAll.toLocaleString()} EGP
+                </span>
+              </div>
+              <div className="bg-slate-800/80 px-3 py-2 rounded-xl border border-slate-700 text-center">
+                <span className="text-[10px] text-slate-400 block font-medium">إجمالي التعاقدات</span>
+                <span className="text-xs font-black text-sky-300 font-mono">
+                  {overallProfitability.totalContractAll.toLocaleString()} EGP
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* HORIZONTAL HUB TABS */}
       <div className="flex border border-slate-200 bg-slate-50 rounded-xl p-1 gap-1 flex-wrap">
         <button
@@ -493,18 +598,61 @@ export default function ClientsView({
           <div className="space-y-6">
             <h3 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-2">دفتر الموكلين المسجلين بالمقر والسحابة</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {filteredClients.map(c => (
+              {filteredClients.map(c => {
+                const prof = clientProfitabilityMap[c.id] || { totalPaid: 0, pendingBalance: c.remainingFees || 0, totalContract: c.remainingFees || 0, percentage: 0, status: "pending" };
+                
+                return (
                 <div key={c.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3 relative overflow-hidden text-right shadow-sm hover:shadow transition">
                   <div className="absolute top-0 left-0 bg-amber-500/10 text-amber-800 text-[10px] font-bold px-3 py-1 rounded-br-lg border-b border-r border-amber-200">
                     الرقم المسلسل #{c.serialNumber}
                   </div>
                   <h4 className="text-sm font-bold text-slate-900 pl-16">{c.name}</h4>
                   
+                  {/* CLIENT PROFITABILITY BADGE */}
+                  <div className="bg-gradient-to-r from-amber-50/80 via-white to-amber-50/50 p-2.5 rounded-xl border border-amber-200/80 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-slate-700 flex items-center gap-1">
+                        <TrendingUp className="w-3 h-3 text-amber-600" />
+                        <span>وسام ربحية الموكل (Client Profitability)</span>
+                      </span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-black flex items-center gap-1 ${
+                        prof.status === "full"
+                          ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                          : prof.status === "high"
+                          ? "bg-amber-100 text-amber-800 border border-amber-300"
+                          : prof.status === "unpaid"
+                          ? "bg-rose-100 text-rose-800 border border-rose-300"
+                          : "bg-blue-100 text-blue-800 border border-blue-300"
+                      }`}>
+                        {prof.status === "full" && "🟢 مسدد بالكامل 100%"}
+                        {prof.status === "high" && `🟡 ربحية عالية (${prof.percentage}%)`}
+                        {prof.status === "pending" && `🔵 تحصيل جاري (${prof.percentage}%)`}
+                        {prof.status === "unpaid" && "🔴 لم يسدد بعد"}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-1.5 text-center text-[10px] pt-1 border-t border-amber-100">
+                      <div className="bg-white px-1.5 py-1 rounded border border-slate-150">
+                        <span className="text-slate-400 block text-[9px]">المسدد</span>
+                        <strong className="text-emerald-700 font-mono font-bold">{prof.totalPaid.toLocaleString()} EGP</strong>
+                      </div>
+                      <div className="bg-white px-1.5 py-1 rounded border border-slate-150">
+                        <span className="text-slate-400 block text-[9px]">المتبقي</span>
+                        <strong className="text-amber-700 font-mono font-bold">{prof.pendingBalance.toLocaleString()} EGP</strong>
+                      </div>
+                      <div className="bg-white px-1.5 py-1 rounded border border-slate-150">
+                        <span className="text-slate-400 block text-[9px]">إجمالي العقد</span>
+                        <strong className="text-slate-800 font-mono font-bold">{prof.totalContract.toLocaleString()} EGP</strong>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 pt-2 border-t border-slate-200/60">
                     <p><span className="text-slate-400 ml-1">الرقم القومي:</span> <strong className="text-slate-950 font-mono">{c.nationalId}</strong></p>
                     <p><span className="text-slate-400 ml-1">التوكيل:</span> <strong className="text-emerald-700">{c.poaNumber} {c.poaLetter} ({c.poaYear})</strong></p>
                     <p><span className="text-slate-400 ml-1">التوثيق:</span> <span className="text-slate-800 leading-none">{c.poaOffice}</span></p>
-                    <p><span className="text-slate-400 ml-1">الهاتف/الواتس:</span> <span className="text-amber-800 font-sans">{c.whatsapp || "غير متوفر"}</span></p>
+                    <p><span className="text-slate-400 ml-1">الهاتف/الواتس:</span> <span className="text-amber-800 font-sans dir-ltr inline-block">{c.whatsapp || c.phone || "غير متوفر"}</span></p>
+                    <p><span className="text-slate-400 ml-1">فيسبوك:</span> <span className="text-blue-700 font-sans truncate">{c.facebook || "غير متوفر"}</span></p>
                     <p><span className="text-slate-400 ml-1">القضية الحالية:</span> <span className="text-blue-700">رقم {c.caseNumber}</span></p>
                     <p><span className="text-slate-400 ml-1">المحكمة:</span> <span className="text-slate-700 truncate">{c.competentCourt}</span></p>
                     <p><span className="text-slate-400 ml-1">باقي الأتعاب:</span> <span className="text-amber-600 font-bold">{c.remainingFees} EGP</span></p>
@@ -516,6 +664,13 @@ export default function ClientsView({
                     <div className="pt-2.5 border-t border-slate-200/60 flex justify-between items-center text-xs">
                       <span className="text-slate-450 font-sans">خزنة الوثائق المعزولة: <strong className="text-emerald-700 font-mono">({c.personalDocuments?.length || 0})</strong></span>
                       <button
+                        onClick={() => onOpenDocumentManager && onOpenDocumentManager("clients", `ملفات وتكامل الموكل: ${c.name}`)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-2.5 py-1 text-[10px] rounded transition shadow-sm cursor-pointer ml-2 flex items-center gap-1"
+                        title="تكامل ومشاركة مباشرة عبر مدير المستندات"
+                      >
+                        🔗 تكامل ومشاركة
+                      </button>
+                      <button
                         id={`manage-client-docs-${c.id}`}
                         onClick={() => setSelectedClientForDocs(c)}
                         className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-2.5 py-1 text-[10px] rounded transition shadow-sm cursor-pointer"
@@ -525,7 +680,8 @@ export default function ClientsView({
                     </div>
                   )}
                 </div>
-              ))}
+              );
+            })}
             </div>
           </div>
         )}
@@ -559,13 +715,10 @@ export default function ClientsView({
                     </div>
                     <div>
                       <label className="block text-[10px] text-slate-600 mb-1" htmlFor="opp-phone">رقم هاتف الخصم (إن وجد للتصالح)</label>
-                      <input
+                      <PhoneInputWithCountry
                         id="opp-phone"
-                        type="tel"
                         value={opPhone}
-                        onChange={(e) => setOpPhone(e.target.value)}
-                        placeholder="رقم الهاتف"
-                        className="w-full px-3 py-1.5 bg-white text-slate-900 text-xs rounded border border-slate-200 text-right focus:border-red-500 outline-none font-sans"
+                        onChange={(full) => setOpPhone(full)}
                       />
                     </div>
                     <button

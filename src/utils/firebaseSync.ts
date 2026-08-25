@@ -64,14 +64,19 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 // -------------------------------------------------------------------------
 export interface License {
   id: string; // مفتاح الترخيص
+  licenseKey?: string;
   holderName: string; // اسم المشتري
   holderPhone: string; // تليفون المشتري
   maxDevices: number; // الحد الأقصى للأجهزة
   maxUsers: number; // الحد الأقصى للمستخدمين
-  approvedDevices: string[]; // الأجهزة المصرح لها بالعمل
-  registeredPhones: string[]; // الهواتف المسجلة على هذه النسخة
-  status: "active" | "inactive";
-  createdAt: string;
+  approvedDevices?: string[]; // الأجهزة المصرح لها بالعمل
+  registeredPhones?: string[]; // الهواتف المسجلة على هذه النسخة
+  status: "active" | "inactive" | "suspended" | "expired";
+  createdAt?: string;
+  issuedAt?: string;
+  expiresAt?: string;
+  devicesUsed?: number;
+  activeDevices?: string[];
 }
 
 export interface ActivationRequest {

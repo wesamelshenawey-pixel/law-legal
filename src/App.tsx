@@ -12,7 +12,10 @@ import {
   AdminCustomProperty, 
   LawCodeBook,
   LeadProfile,
-  Announcement
+  Announcement,
+  ClientNote,
+  NoteSignatureData,
+  ConnectedDeviceRecord
 } from "./types";
 
 import { 
@@ -35,23 +38,77 @@ import CasesView from "./components/CasesView";
 import ClientsView from "./components/ClientsView";
 import FeesView from "./components/FeesView";
 import AiAssistantView from "./components/AiAssistantView";
+import AiVoiceAssistantLauncher from "./components/AiVoiceAssistantLauncher";
 import CompaniesView from "./components/CompaniesView";
 import DocumentationView from "./components/DocumentationView";
 import AdminWorkView from "./components/AdminWorkView";
 import LawCodesView from "./components/LawCodesView";
 import SettingsView from "./components/SettingsView";
 import SocialHubView from "./components/SocialHubView";
+import TenantsAdminView from "./components/TenantsAdminView";
 import AnnouncementsView from "./components/AnnouncementsView";
 import AnnouncementTicker from "./components/AnnouncementTicker";
 import AdvancedDocumentEditor from "./components/AdvancedDocumentEditor";
 import SmartOcrStudio from "./components/SmartOcrStudio";
+import GoogleWorkspaceHub from "./components/GoogleWorkspaceHub";
 import ImportFilesView from "./components/ImportFilesView";
 import GlobalSearchView from "./components/GlobalSearchView";
 import UserProfileCircle from "./components/UserProfileCircle";
 import DesignsView from "./components/DesignsView";
+import RequestSignatureLinkModal from "./components/RequestSignatureLinkModal";
+import ClientSignatureConfirmationPortal from "./components/ClientSignatureConfirmationPortal";
+import LawyerSignatureSeal from "./components/LawyerSignatureSeal";
+import UrgentFollowUpView from "./components/UrgentFollowUpView";
+import LegalTemplatesView from "./components/LegalTemplatesView";
+import AttachmentsView from "./components/AttachmentsView";
+import OfficeServicesView from "./components/OfficeServicesView";
+import LegalAiAnalysisView from "./components/LegalAiAnalysisView";
+import EgyptianLawyerAiView from "./components/EgyptianLawyerAiView";
+import SmartNotificationsView from "./components/SmartNotificationsView";
+import { buildConfirmationLink } from "./utils/workspaceService";
 import { UserDesignPreferences, DEFAULT_DESIGN_PREFERENCES, DESIGN_PRESETS } from "./utils/themePresets";
 import { SidebarDisplayMode } from "./components/Sidebar";
-import { Search, Save, Check, Loader2, ShieldCheck, RefreshCw } from "lucide-react";
+import { 
+  Search, 
+  Save, 
+  Check, 
+  Loader2, 
+  ShieldCheck, 
+  RefreshCw, 
+  PenTool, 
+  FileSignature, 
+  CheckCircle2, 
+  Clock, 
+  Copy, 
+  Share2, 
+  Award, 
+  Printer, 
+  FileCheck2, 
+  X,
+  Phone,
+  FileText,
+  Wifi,
+  WifiOff,
+  Bell,
+  BellRing,
+  BellOff
+} from "lucide-react";
+
+import { 
+  registerServiceWorker, 
+  setupNetworkSyncListener, 
+  enqueueOfflineSync, 
+  flushOfflineSyncQueue, 
+  getOfflineSyncQueue 
+} from "./utils/offlineSync";
+
+import {
+  getNotificationPermissionStatus,
+  requestBrowserNotificationPermission,
+  sendBrowserNotification,
+  checkUpcomingSessionsAndNotify,
+  notifyClientActivity
+} from "./utils/browserNotifications";
 
 // Licensing / Licensing Helper Sync imports
 import LicensingGate from "./components/LicensingGate";
@@ -284,7 +341,10 @@ export default function App() {
     localStorage.setItem("law_announcements", JSON.stringify(announcements));
   }, [announcements]);
 
-  const [activeSection, setActiveSection] = useState("dashboard");
+  const [activeSection, setActiveSection] = useState(() => {
+    const savedRole = localStorage.getItem("law_role");
+    return savedRole === "client" ? "social" : "dashboard";
+  });
   const [sidebarMode, setSidebarMode] = useState<SidebarDisplayMode>("full");
   const [editorInitialText, setEditorInitialText] = useState("");
   const [isDocDropdownOpen, setIsDocDropdownOpen] = useState(false);
@@ -293,20 +353,6 @@ export default function App() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   // Client leave-note modal and logging states (with local storage persistence)
-  interface ClientNote {
-    id: string;
-    clientName: string;
-    text: string;
-    date: string;
-    priority?: "High" | "Normal" | "Low";
-    category?: "Legal Document" | "Consultation" | "Fee Inquiry" | "Scheduling" | string;
-    linkedAttachments?: { id: string, name: string, url: string }[];
-    status?: "Pending" | "Read by Attorney" | "Acknowledged";
-    scheduledReminder?: boolean;
-    referencedCaseId?: string;
-    attorneyReply?: string;
-  }
-
   const [clientNotes, setClientNotes] = useState<ClientNote[]>(() => {
     const saved = localStorage.getItem("law_clientNotes");
     return saved ? JSON.parse(saved) : [
@@ -318,7 +364,18 @@ export default function App() {
         priority: "High",
         status: "Read by Attorney",
         scheduledReminder: true,
-        attorneyReply: "تم استلام المستندات وجاري العمل عليها."
+        attorneyReply: "تم استلام المستندات وجاري العمل عليها.",
+        requiresSignature: true,
+        signatureStatus: "signed",
+        signatureData: {
+          signedBy: "الموكل المعتمد",
+          nationalId: "29201011234567",
+          signedAt: "2026-06-05T10:20:00.000Z",
+          verificationHash: "E-SIG-9842-VERIFIED-AUTH",
+          digitalStamp: "مكتب الأستاذ وسام الشناوي - توقيع إلكتروني معتمد قانونياً",
+          lawyerSignatureName: "الأستاذ وسام أحمد الشناوي المحامي بالنقض",
+          ipOrDeviceId: "Device-Verified-EG"
+        }
       },
       {
         id: "note-init-2",
@@ -327,7 +384,11 @@ export default function App() {
         date: "2026-06-07T14:30:00.000Z",
         priority: "Normal",
         status: "Pending",
-        scheduledReminder: false
+        scheduledReminder: false,
+        requiresSignature: true,
+        signatureStatus: "pending",
+        confirmationToken: "SIG-9842KLP",
+        confirmationLink: "https://diwan-law.app/confirm/note-init-2?token=SIG-9842KLP"
       }
     ];
   });
@@ -338,6 +399,46 @@ export default function App() {
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
   const [documentManagerSection, setDocumentManagerSection] = useState("cases");
   const [documentManagerSectionLabel, setDocumentManagerSectionLabel] = useState("القضايا");
+
+  // OFFLINE-FIRST & SERVICE WORKER SYNC STATES
+  const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== "undefined" ? navigator.onLine : true);
+  const [offlinePendingCount, setOfflinePendingCount] = useState<number>(() => getOfflineSyncQueue().length);
+  const [isSyncingQueue, setIsSyncingQueue] = useState<boolean>(false);
+
+  // Register service worker for offline caching and setup network synchronization
+  useEffect(() => {
+    registerServiceWorker();
+
+    const cleanupSyncListener = setupNetworkSyncListener(
+      (online) => {
+        setIsOnline(online);
+        setOfflinePendingCount(getOfflineSyncQueue().length);
+      },
+      (successCount) => {
+        setOfflinePendingCount(getOfflineSyncQueue().length);
+      }
+    );
+
+    return cleanupSyncListener;
+  }, []);
+
+  const handleManualFlushOfflineSync = async () => {
+    if (isSyncingQueue) return;
+    setIsSyncingQueue(true);
+    try {
+      const result = await flushOfflineSyncQueue();
+      setOfflinePendingCount(getOfflineSyncQueue().length);
+      if (result.syncedCount > 0) {
+        alert(language === "ar" ? `✓ تمت مزامنة ${result.syncedCount} عمليات معلقة مع السحابة بنجاح!` : `✓ Successfully synced ${result.syncedCount} pending items to the cloud!`);
+      } else {
+        alert(language === "ar" ? "جميع البيانات متزامنة ومحدثة بالكامل مع السحابة." : "All data is already in sync with the cloud.");
+      }
+    } catch (e) {
+      console.error("Manual sync failed:", e);
+    } finally {
+      setIsSyncingQueue(false);
+    }
+  };
 
   const [managedDocuments, setManagedDocuments] = useState<ManagedDocument[]>(() => {
     const saved = localStorage.getItem("law_managed_documents");
@@ -406,7 +507,16 @@ export default function App() {
   const [noteFilterPriority, setNoteFilterPriority] = useState<"All" | "High" | "Normal" | "Low">("All");
   const [buttonRipples, setButtonRipples] = useState<{ x: number; y: number; id: number }[]>([]);
 
-  // Toast notifications states
+  // Digital Signature States for Client Note Interface
+  const [requestDigitalSignature, setRequestDigitalSignature] = useState(false);
+  const [signatureClientPhone, setSignatureClientPhone] = useState("");
+  const [signatureLegalAffirmation, setSignatureLegalAffirmation] = useState("أقر أنا الموكل بصحة ومسؤولية ما ورد في هذه الملحوظة والإفادة القضائية الموجهة لهيئة الدفاع.");
+  const [signingNotePortal, setSigningNotePortal] = useState<ClientNote | null>(null);
+  const [viewingCertificateNote, setViewingCertificateNote] = useState<ClientNote | null>(null);
+  const [requestSignatureModalNote, setRequestSignatureModalNote] = useState<ClientNote | null>(null);
+  const [copiedNoteLinkId, setCopiedNoteLinkId] = useState<string | null>(null);
+
+  // Toast & Browser Push notifications states
   interface ToastMessage {
     id: string;
     title: string;
@@ -415,6 +525,42 @@ export default function App() {
   }
   const [activeToasts, setActiveToasts] = useState<ToastMessage[]>([]);
   const [toastsTriggered, setToastsTriggered] = useState(false);
+  const [browserNotificationStatus, setBrowserNotificationStatus] = useState<string>(() => {
+    return getNotificationPermissionStatus();
+  });
+
+  const handleRequestPushNotifications = async () => {
+    const status = await requestBrowserNotificationPermission();
+    setBrowserNotificationStatus(status);
+    if (status === "granted") {
+      sendBrowserNotification(
+        language === "ar" ? "⚖️ تم تفعيل إشعارات المتصفح بنجاح" : "⚖️ Push Notifications Activated",
+        {
+          body: language === "ar" 
+            ? "ستتلقى الآن تنبيهات صوتية وفورية عند ورود رسائل جديدة من الموكلين أو اقتراب جلسات المحاكمة." 
+            : "You will now receive real-time audio and push alerts for upcoming court sessions and client messages.",
+          tag: "notification-activation-confirm",
+          icon: "/icon-192.png"
+        }
+      );
+      checkUpcomingSessionsAndNotify(sessions, language);
+    }
+  };
+
+  // Monitor upcoming court sessions for native push notifications
+  useEffect(() => {
+    if (sessions.length > 0 && currentUser && (currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.STAFF)) {
+      checkUpcomingSessionsAndNotify(sessions, language);
+    }
+
+    const interval = setInterval(() => {
+      if (sessions.length > 0 && currentUser && (currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.STAFF)) {
+        checkUpcomingSessionsAndNotify(sessions, language);
+      }
+    }, 15 * 60 * 1000); // Check every 15 minutes
+
+    return () => clearInterval(interval);
+  }, [sessions, currentUser, language]);
 
   const getFormattedDate = (offsetDays = 0) => {
     const d = new Date();
@@ -773,10 +919,17 @@ export default function App() {
     scheduledReminder: boolean = false,
     referencedCase: string = "",
     category: string = "Consultation",
-    linkedAttachments: any[] = []
+    linkedAttachments: any[] = [],
+    requiresSignature: boolean = false,
+    clientPhone: string = "",
+    legalAffirmation: string = ""
   ) => {
+    const noteId = "note-" + Math.random().toString(36).substr(2, 9);
+    const token = "SIG-" + Math.random().toString(36).substr(2, 7).toUpperCase();
+    const confirmLink = buildConfirmationLink(noteId, token);
+
     const newNote: ClientNote = {
-      id: "note-" + Math.random().toString(36).substr(2, 9),
+      id: noteId,
       clientName: clName,
       text: text,
       date: new Date().toISOString(),
@@ -785,29 +938,117 @@ export default function App() {
       linkedAttachments,
       status: "Pending",
       scheduledReminder,
-      referencedCaseId: referencedCase
+      referencedCaseId: referencedCase,
+      requiresSignature,
+      clientPhone: clientPhone || undefined,
+      legalAffirmation: legalAffirmation || undefined,
+      signatureStatus: requiresSignature ? "pending" : "none",
+      confirmationToken: requiresSignature ? token : undefined,
+      confirmationLink: requiresSignature ? confirmLink : undefined,
+      signatureRequestedBy: requiresSignature ? "client" : undefined,
+      signatureRequestedAt: requiresSignature ? new Date().toISOString() : undefined,
+      signatureHistory: requiresSignature ? [
+        {
+          timestamp: new Date().toISOString(),
+          action: "طلب توقيع رقمي وإصدار رابط تأكيد قانوني",
+          performedBy: clName,
+          status: "pending",
+          notes: "تم إنشاء طلب التوقيع الإلكتروني وتوليد رابط التأكيد الرقمي المعتمد"
+        }
+      ] : []
     };
+
     setClientNotes(prev => {
       const updated = [newNote, ...prev];
       localStorage.setItem("law_clientNotes", JSON.stringify(updated));
       return updated;
     });
+
+    // Trigger Browser Push Notification Alert for staff/lawyers
+    notifyClientActivity(
+      clName,
+      priority === "High" ? "رسالة عاجلة جداً من موكل" : "رسالة جديدة من موكل",
+      text,
+      language
+    );
     
     let alertMsg = "";
     if (language === "ar") {
       alertMsg = `عزيزنا الموكل [${clName}] تم وضع ملحوظتك بالنجاح!\n`;
       alertMsg += `الأولوية المعينة: ${priority === "High" ? "🚨 عاجل جداً" : priority === "Normal" ? "⚡ متوسط" : "📌 عادي"}\n`;
+      if (requiresSignature) {
+        alertMsg += `✍️ تم تفعيل طلب التوقيع الرقمي وإصدار رابط التأكيد القانوني الخاص بك.\n`;
+      }
       if (scheduledReminder) {
         alertMsg += `✔️ تم تفعيل طلب التذكير التلقائي (SMS / Push) قبل جلسة المحاكمة بـ 24 ساعة لضمان حضورك.`;
       }
     } else {
       alertMsg = `Dear Client [${clName}], your message is dispatched successfully!\n`;
       alertMsg += `Urgency: ${priority}\n`;
+      if (requiresSignature) {
+        alertMsg += `✍️ Digital signature confirmation link generated.\n`;
+      }
       if (scheduledReminder) {
         alertMsg += `✔️ Automated SMS reminder has been successfully requested 24 hours prior to court session.`;
       }
     }
     alert(alertMsg);
+  };
+
+  const handleUpdateClientNote = (noteId: string, updatedFields: Partial<ClientNote>) => {
+    setClientNotes(prev => {
+      const updated = prev.map(note => {
+        if (note.id === noteId) {
+          const history = note.signatureHistory ? [...note.signatureHistory] : [];
+          if (updatedFields.signatureStatus && updatedFields.signatureStatus !== note.signatureStatus) {
+            history.push({
+              timestamp: new Date().toISOString(),
+              action: updatedFields.signatureStatus === "signed" ? "اعتماد وتوقيع المذكرة إلكترونياً" : "تحديث حالة التوقيع",
+              performedBy: updatedFields.signatureData?.signedBy || currentUser?.name || "المستخدم",
+              status: updatedFields.signatureStatus,
+              notes: updatedFields.signatureData ? `بصمة التحقق: ${updatedFields.signatureData.verificationHash}` : "تعديل الحالة من سجل المحامي"
+            });
+          }
+          return { ...note, ...updatedFields, signatureHistory: history };
+        }
+        return note;
+      });
+      localStorage.setItem("law_clientNotes", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const handleReplyToClientNote = (noteId: string, reply: string) => {
+    setClientNotes(prev => {
+      const updated = prev.map(note => {
+        if (note.id === noteId) {
+          const history = note.signatureHistory ? [...note.signatureHistory] : [];
+          history.push({
+            timestamp: new Date().toISOString(),
+            action: "رد الأستاذ وسام الشناوي / هيئة الدفاع",
+            performedBy: currentUser?.name || "المحامي المعتمد",
+            status: note.signatureStatus || "none",
+            notes: reply
+          });
+          return {
+            ...note,
+            attorneyReply: reply,
+            status: "Read by Attorney" as const,
+            signatureHistory: history
+          };
+        }
+        return note;
+      });
+      localStorage.setItem("law_clientNotes", JSON.stringify(updated));
+      return updated;
+    });
+
+    notifyClientActivity(
+      "الأستاذ وسام الشناوي المحامي بالنقض",
+      "تم إرسال رد رسمي على ملحوظة الموكل",
+      reply,
+      language
+    );
   };
 
   const handleMarkNoteAsRead = (noteId: string) => {
@@ -1062,12 +1303,17 @@ export default function App() {
           return; // Abort login
         } else {
           // Register this new device
-          const newDevice = {
+          const newDevice: ConnectedDeviceRecord = {
             deviceId: devId,
             deviceName: navigator.userAgent.substring(0, 30) + "...",
-            lastLogin: new Date().toISOString()
+            deviceType: "desktop",
+            os: "Web",
+            browser: "Browser",
+            firstLogin: new Date().toISOString(),
+            lastLogin: new Date().toISOString(),
+            isCurrentDevice: true
           };
-          const updatedUser = { ...user, connectedDevices: [...connected, newDevice] };
+          const updatedUser: PlatformUser = { ...user, connectedDevices: [...connected, newDevice] };
           handleUpdateUser(user.id, updatedUser);
           user = updatedUser; // Use updated user for current session
         }
@@ -1172,6 +1418,10 @@ export default function App() {
 
   const handleUpdateCase = (id: string, updatedFields: Partial<CaseRecord>) => {
     setCases(prev => prev.map(c => c.id === id ? { ...c, ...updatedFields } : c));
+  };
+
+  const handleDeleteCase = (id: string) => {
+    setCases(prev => prev.filter(c => c.id !== id));
   };
 
   const handleImportLeads = (newLeads: LeadProfile[]) => {
@@ -1286,6 +1536,85 @@ export default function App() {
   // ----------------------------------------------------
   const renderActiveView = () => {
     switch (activeSection) {
+      case "legal_ai_analysis":
+        return (
+          <LegalAiAnalysisView
+            cases={cases}
+            clients={clients}
+            language={language}
+          />
+        );
+      case "smart_notifications":
+        return (
+          <SmartNotificationsView
+            cases={cases}
+            clients={clients}
+            language={language}
+          />
+        );
+      case "urgent_followup":
+        return (
+          <UrgentFollowUpView
+            cases={cases}
+            clients={clients}
+            sessions={sessions}
+            clientNotes={clientNotes}
+            fees={fees}
+            currentUser={currentUser!}
+            onNavigate={(sec, extra) => {
+              if (extra && extra.caseId) {
+                setDefaultSelectCaseId(extra.caseId);
+              }
+              setActiveSection(sec);
+            }}
+            language={language}
+          />
+        );
+      case "office_services":
+        return (
+          <OfficeServicesView
+            currentUser={currentUser!}
+            language={language}
+            onNavigate={(sec) => setActiveSection(sec)}
+          />
+        );
+      case "legal_templates":
+        return (
+          <LegalTemplatesView
+            clients={clients}
+            cases={cases}
+            currentUser={currentUser!}
+            onSaveToCaseAttachments={(caseId, docName, content) => {
+              const savedDocs = JSON.parse(localStorage.getItem("law_managed_documents") || "[]");
+              const newDoc = {
+                id: "doc-" + Date.now(),
+                name: docName,
+                type: "word",
+                section: "cases",
+                sectionLabel: "ملفات القضايا",
+                fileBase64: content,
+                addedAt: new Date().toISOString(),
+                caseId: caseId
+              };
+              localStorage.setItem("law_managed_documents", JSON.stringify([newDoc, ...savedDocs]));
+            }}
+            onOpenInEditor={(text, title, clientName, caseNumber) => {
+              setEditorInitialText(text);
+              setActiveSection("doc_editor");
+            }}
+            language={language}
+          />
+        );
+      case "attachments":
+        return (
+          <AttachmentsView
+            cases={cases}
+            clients={clients}
+            currentUser={currentUser!}
+            onNavigateToOcr={() => setActiveSection("smart_ocr")}
+            language={language}
+          />
+        );
       case "dashboard":
         return (
           <DashboardView 
@@ -1296,6 +1625,8 @@ export default function App() {
             fees={fees}
             clientNotes={clientNotes}
             onMarkNoteAsRead={handleMarkNoteAsRead}
+            onUpdateClientNote={handleUpdateClientNote}
+            onReplyToNote={handleReplyToClientNote}
             onAddClient={handleAddClient}
             onAddCase={handleAddCase}
             onImportLeads={handleImportLeads}
@@ -1335,6 +1666,7 @@ export default function App() {
             courtsList={courtsList}
             subjectsList={subjectsList}
             onUpdateCase={handleUpdateCase}
+            onDeleteCase={handleDeleteCase}
             currentUser={currentUser!}
             language={language}
             defaultSelectCaseId={defaultSelectCaseId}
@@ -1353,6 +1685,7 @@ export default function App() {
             clients={clients}
             opponents={opponents}
             leads={leads}
+            fees={fees}
             registeredUsers={registeredUsers}
             onAddClient={handleAddClient}
             onAddOpponent={handleAddOpponent}
@@ -1382,6 +1715,14 @@ export default function App() {
         return (
           <AiAssistantView 
             currentUser={currentUser!}
+          />
+        );
+      case "egyptian_lawyer_ai":
+        return (
+          <EgyptianLawyerAiView 
+            currentUser={currentUser!}
+            language={language}
+            onNavigate={(sec) => setActiveSection(sec)}
           />
         );
       case "companies":
@@ -1499,6 +1840,28 @@ export default function App() {
             onNavigateToOcr={() => setActiveSection("smart_ocr")}
           />
         );
+      case "workspace":
+        return (
+          <GoogleWorkspaceHub
+            currentUser={currentUser!}
+            cases={cases}
+            clients={clients}
+            sessions={sessions}
+            language={language}
+            initialTab="sheets"
+          />
+        );
+      case "keep":
+        return (
+          <GoogleWorkspaceHub
+            currentUser={currentUser!}
+            cases={cases}
+            clients={clients}
+            sessions={sessions}
+            language={language}
+            initialTab="keep"
+          />
+        );
       default:
         const targetDyn = customSections.find(s => s.id === activeSection);
         if (targetDyn) {
@@ -1612,8 +1975,8 @@ export default function App() {
       <div 
         className={`fixed top-4 z-40 transition-all duration-300 flex justify-center ${
           language === "ar"
-            ? sidebarMode === "full" ? "right-[330px] left-16 md:left-20" : sidebarMode === "emoji" ? "right-[90px] left-16 md:left-20" : "right-16 md:right-20 left-16 md:left-20"
-            : sidebarMode === "full" ? "left-[330px] right-16 md:right-20" : sidebarMode === "emoji" ? "left-[90px] right-16 md:right-20" : "left-16 md:left-20 right-16 md:right-20"
+            ? currentUser.role !== UserRole.CLIENT && sidebarMode === "full" ? "right-[330px] left-16 md:left-20" : currentUser.role !== UserRole.CLIENT && sidebarMode === "emoji" ? "right-[90px] left-16 md:left-20" : "right-16 md:right-20 left-16 md:left-20"
+            : currentUser.role !== UserRole.CLIENT && sidebarMode === "full" ? "left-[330px] right-16 md:right-20" : currentUser.role !== UserRole.CLIENT && sidebarMode === "emoji" ? "left-[90px] right-16 md:right-20" : "left-16 md:left-20 right-16 md:right-20"
         }`}
       >
         <div className="w-full max-w-4xl">
@@ -1626,7 +1989,7 @@ export default function App() {
       </div>
 
       {/* Sidebar Navigation */}
-      <Sidebar 
+      {currentUser.role !== UserRole.CLIENT && <Sidebar 
         currentUser={currentUser}
         activeSection={activeSection}
         setActiveSection={setActiveSection}
@@ -1637,20 +2000,19 @@ export default function App() {
         language={language}
         sidebarMode={sidebarMode}
         setSidebarMode={setSidebarMode}
-      />
-
-      {/* Main Container with Dynamic Margins based on Sidebar Mode */}
+      />}
+      {/* Main Container with Dynamic Margins and 2cm lowered top offset for desktop and mobile */}
       <main 
-        className={`flex-1 p-4 sm:p-6 lg:p-8 pt-20 md:pt-24 overflow-y-auto max-h-screen transition-all duration-300 ${
+        className={`flex-1 p-3.5 sm:p-6 lg:p-8 pt-[calc(4.5rem+2cm)] sm:pt-[calc(5rem+2cm)] md:pt-[calc(5.5rem+2cm)] pb-16 overflow-y-auto max-h-screen transition-all duration-300 ${
           language === "ar"
-            ? sidebarMode === "full"
+            ? currentUser.role !== UserRole.CLIENT && sidebarMode === "full"
               ? "md:mr-[320px]"
-              : sidebarMode === "emoji"
+              : currentUser.role !== UserRole.CLIENT && sidebarMode === "emoji"
               ? "md:mr-[80px]"
               : "mr-0"
-            : sidebarMode === "full"
+            : currentUser.role !== UserRole.CLIENT && sidebarMode === "full"
               ? "md:ml-[320px]"
-              : sidebarMode === "emoji"
+              : currentUser.role !== UserRole.CLIENT && sidebarMode === "emoji"
               ? "md:ml-[80px]"
               : "ml-0"
         }`}
@@ -1669,6 +2031,7 @@ export default function App() {
               </span>
               <h1 className="text-base md:text-xl font-black text-slate-950 dark:text-white tracking-tight">
                 {activeSection === "dashboard" && (language === "ar" ? "لوحة المتابعة الشاملة" : "Dashboard")}
+                {activeSection === "office_services" && (language === "ar" ? "قائمة الخدمات القانونية والإدارية الشاملة" : "Comprehensive Legal Services")}
                 {activeSection === "cases" && (language === "ar" ? "إدارة القضايا والدعاوى" : "Cases & Court Files")}
                 {activeSection === "clients" && (language === "ar" ? "سجل الموكلين وجهات الاتصال" : "Clients & Contacts")}
                 {activeSection === "sessions" && (language === "ar" ? "أجندة الجلسات اليومية" : "Court Sessions Agenda")}
@@ -1680,13 +2043,98 @@ export default function App() {
                 {activeSection === "social" && (language === "ar" ? "ديوان التواصل والاستشارات" : "Social & Interactive Hub")}
                 {activeSection === "announcements" && (language === "ar" ? "شريط الإعلانات والتعميمات القضائية" : "Public Announcements & Legal Bulletins")}
                 {activeSection === "import_files" && (language === "ar" ? "استيراد وإدارة الملفات" : "Import Files")}
+                {activeSection === "keep" && (language === "ar" ? "ملاحظات ومذكرات Google Keep القضائية" : "Google Keep Legal Notes")}
+                {activeSection === "workspace" && (language === "ar" ? "منظومة Google Workspace السحابية" : "Google Workspace Cloud")}
                 {activeSection === "settings" && (language === "ar" ? "إعدادات النظام والترخيص" : "Settings & Licenses")}
+                {activeSection === "tenants_admin" && (language === "ar" ? "إدارة المكاتب والمشتركين" : "Tenants Admin")}
               </h1>
             </div>
           </div>
 
-          {/* Top Header Actions (Search Bar) */}
-          <div className="flex flex-wrap items-center gap-3 relative">
+          {/* Top Header Actions (Search Bar, Notifications, & Offline Sync Status Indicator) */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 relative">
+            {/* Browser Push Notifications Quick Toggle */}
+            <button
+              type="button"
+              onClick={handleRequestPushNotifications}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-black transition-all shadow-xs cursor-pointer ${
+                browserNotificationStatus === "granted"
+                  ? "bg-amber-500/15 border-amber-500/40 text-amber-900 dark:text-amber-300 hover:bg-amber-500/25"
+                  : browserNotificationStatus === "denied"
+                  ? "bg-slate-500/10 border-slate-500/30 text-slate-500 hover:bg-slate-500/20"
+                  : "bg-red-500/10 border-red-500/40 text-red-700 dark:text-red-300 hover:bg-red-500/20 animate-pulse"
+              }`}
+              title={
+                browserNotificationStatus === "granted"
+                  ? "إشعارات المتصفح الفورية مفعلة (انقر لاختبار التنبيه الصوتي)"
+                  : browserNotificationStatus === "denied"
+                  ? "الإشعارات محظورة في إعدادات المتصفح"
+                  : "انقر لتفعيل إشعارات المتصفح لتنبيهك بجلسات المحاكمة ورسائل الموكلين"
+              }
+            >
+              {browserNotificationStatus === "granted" ? (
+                <>
+                  <BellRing className="w-3.5 h-3.5 text-amber-500 animate-bounce" />
+                  <span>{language === "ar" ? "الإشعارات مفعلة 🔔" : "Push Active"}</span>
+                </>
+              ) : browserNotificationStatus === "denied" ? (
+                <>
+                  <BellOff className="w-3.5 h-3.5" />
+                  <span>{language === "ar" ? "إشعارات محظورة" : "Notifications Blocked"}</span>
+                </>
+              ) : (
+                <>
+                  <Bell className="w-3.5 h-3.5 text-red-500" />
+                  <span>{language === "ar" ? "تفعيل إشعارات الجلسات 🔔" : "Enable Push Alerts"}</span>
+                </>
+              )}
+            </button>
+
+            {/* Offline-First & Network Status Chip */}
+            <div 
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[11px] font-bold transition-all shadow-xs select-none ${
+                !isOnline 
+                  ? "bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-300"
+                  : offlinePendingCount > 0
+                  ? "bg-blue-500/10 border-blue-500/30 text-blue-900 dark:text-blue-300"
+                  : "bg-emerald-500/10 border-emerald-500/30 text-emerald-900 dark:text-emerald-300"
+              }`}
+              title={!isOnline ? "النظام يعمل حالياً في وضع عدم الاتصال بالإنترنت مع حفظ محلي كامل" : "النظام متصل بالسحابة ومتزامن"}
+            >
+              {!isOnline ? (
+                <>
+                  <WifiOff className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+                  <span className="font-extrabold">{language === "ar" ? "وضع دون اتصال" : "Offline"}</span>
+                  {offlinePendingCount > 0 && (
+                    <span className="px-1.5 py-0.2 bg-amber-500 text-slate-950 rounded-md font-mono text-[9px] font-black">
+                      {offlinePendingCount} معلق
+                    </span>
+                  )}
+                </>
+              ) : offlinePendingCount > 0 ? (
+                <>
+                  <RefreshCw className={`w-3.5 h-3.5 text-blue-600 ${isSyncingQueue ? "animate-spin" : ""}`} />
+                  <span>{language === "ar" ? `مزامنة (${offlinePendingCount})` : `Sync (${offlinePendingCount})`}</span>
+                  <button
+                    type="button"
+                    onClick={handleManualFlushOfflineSync}
+                    disabled={isSyncingQueue}
+                    className="px-1.5 py-0.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-[9px] font-black cursor-pointer transition"
+                  >
+                    {isSyncingQueue ? "جاري..." : "مزامنة الآن"}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  <span className="text-[10px]">{language === "ar" ? "سحابي متزامن" : "Live Cloud"}</span>
+                </>
+              )}
+            </div>
+
             {/* Quick Global Search Trigger Button */}
             <button
               id="global-system-search-btn"
@@ -1921,6 +2369,74 @@ export default function App() {
                   </button>
                 </div>
 
+                {/* DIGITAL SIGNATURE REQUEST CONTROLS FOR CLIENT NOTE */}
+                <div className="bg-amber-500/10 border border-amber-500/30 p-3.5 rounded-2xl space-y-2.5 text-right">
+                  <div className="flex justify-between items-center flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 bg-amber-500/20 text-amber-900 rounded-lg border border-amber-500/30">
+                        <FileSignature className="w-4 h-4 text-amber-700" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-black text-slate-900 block">
+                          ✍️ طلب توقيع رقمي وتوليد رابط تأكيد قانوني معتمد:
+                        </span>
+                        <span className="text-[10px] text-slate-600">
+                          إصدار بصمة إلكترونية مشفرة ورابط رسمي لإثبات وتوثيق هذه المذكرة قانونياً
+                        </span>
+                      </div>
+                    </div>
+
+                    <label className="relative inline-flex items-center cursor-pointer select-none">
+                      <input 
+                        type="checkbox" 
+                        checked={requestDigitalSignature}
+                        onChange={(e) => setRequestDigitalSignature(e.target.checked)}
+                        className="sr-only peer" 
+                      />
+                      <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                      <span className="mr-2 text-xs font-black text-slate-800">
+                        {requestDigitalSignature ? "مطلوب توقيع إلكتروني" : "بدون توقيع رقمي"}
+                      </span>
+                    </label>
+                  </div>
+
+                  {requestDigitalSignature && (
+                    <div className="pt-2 border-t border-amber-500/20 space-y-2 animate-in fade-in duration-200">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <label className="text-[10.5px] font-bold text-slate-800 flex items-center gap-1">
+                            <Phone className="w-3 h-3 text-amber-600" />
+                            <span>رقم هاتف الموكل لإرسال رابط التأكيد (WhatsApp / SMS):</span>
+                          </label>
+                          <input
+                            type="tel"
+                            dir="ltr"
+                            placeholder="مثال: 01012345678"
+                            value={signatureClientPhone}
+                            onChange={(e) => setSignatureClientPhone(e.target.value)}
+                            className="w-full bg-white text-slate-900 border border-slate-300 rounded-lg p-2 text-xs outline-none focus:border-amber-500 font-mono text-right"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10.5px] font-bold text-slate-800 flex items-center gap-1">
+                            <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                            <span>صيغة الإقرار القانوني المطلوب المصادقة عليه:</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={signatureLegalAffirmation}
+                            onChange={(e) => setSignatureLegalAffirmation(e.target.value)}
+                            className="w-full bg-white text-slate-900 border border-slate-300 rounded-lg p-2 text-xs outline-none focus:border-amber-500 font-sans text-right"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-[9.5px] text-amber-900 bg-amber-50 p-2 rounded-lg border border-amber-200">
+                        ⚡ بمجرد الإرسال، سيتم توليد رمز مشفر ورابط تأكيد قانوني معتمد يمكن استخدامه لتوقيع المذكرة فورياً أو عبر الهاتف.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                 {/* Textarea field for leaving note with Draft Auto-save indicator */}
                 <div className="space-y-1.5 text-right">
                   <div className="flex justify-between items-center flex-wrap gap-2">
@@ -2041,7 +2557,7 @@ export default function App() {
                 {/* Note History and Current Interactions */}
                 <div className="space-y-2 text-right">
                   <div className="flex justify-between items-center border-b border-slate-100 pb-1.5 flex-wrap gap-2">
-                    <span className="text-xs font-black text-slate-800">📋 السجل التاريخي لمذكراتك وحالة قراءتها</span>
+                    <span className="text-xs font-black text-slate-800">📋 السجل التاريخي لمذكراتك وحالة قراءتها والتوقيع الرقمي</span>
                     
                     <div className="flex items-center gap-2">
                       <select
@@ -2073,7 +2589,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="max-h-36 overflow-y-auto space-y-2 pr-1">
+                  <div className="max-h-64 overflow-y-auto space-y-2.5 pr-1">
                     {clientNotes
                       .filter(n => n.clientName === currentUser.name || currentUser.name === "الموكل المعتمد")
                       .filter(n => noteFilterPriority === "All" || n.priority === noteFilterPriority)
@@ -2104,8 +2620,8 @@ export default function App() {
                           );
                         })
                         .map((note) => (
-                          <div key={note.id} className="p-3 bg-slate-50/80 rounded-xl border border-slate-200/80 flex flex-col gap-1.5 text-right">
-                            <div className="flex justify-between items-center text-[9px] text-slate-400 flex-wrap gap-1">
+                          <div key={note.id} className="p-3.5 bg-slate-50/90 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-2 text-right">
+                            <div className="flex justify-between items-center text-[9px] text-slate-500 flex-wrap gap-1">
                               <div className="flex items-center gap-1.5">
                                 <span className="font-bold text-slate-900">📡 مرسلة للأستاذ وسام</span>
                                 <span className={`px-1.5 py-0.2 rounded text-[8px] font-extrabold ${
@@ -2123,14 +2639,120 @@ export default function App() {
                                   </span>
                                 )}
                               </div>
-                              <span className="font-mono">{new Date(note.date).toLocaleString("ar-EG")}</span>
+                              <span className="font-mono text-slate-400">{new Date(note.date).toLocaleString("ar-EG")}</span>
                             </div>
 
-                            <p className="text-xs text-slate-800 font-medium leading-relaxed">{note.text}</p>
+                            <p className="text-xs text-slate-800 font-medium leading-relaxed bg-white p-2.5 rounded-xl border border-slate-100">
+                              {note.text}
+                            </p>
                             
+                            {/* DIGITAL SIGNATURE STATUS PANEL IN NOTE LOG */}
+                            <div className="p-2.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs transition-colors bg-white border-slate-200">
+                              <div className="flex items-center gap-2">
+                                {note.signatureStatus === "signed" ? (
+                                  <div className="flex items-center gap-1.5 text-emerald-800 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                                    <div className="flex flex-col">
+                                      <span className="font-black text-[10px]">موقّع ومصادق إلكترونياً ✔️</span>
+                                      <span className="text-[9px] text-emerald-700 font-mono">
+                                        بواسطة: {note.signatureData?.signedBy} | {note.signatureData?.verificationHash?.slice(0, 16)}...
+                                      </span>
+                                    </div>
+                                  </div>
+                                ) : note.signatureStatus === "pending" ? (
+                                  <div className="flex items-center gap-1.5 text-amber-800 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200 animate-pulse">
+                                    <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                                    <div className="flex flex-col">
+                                      <span className="font-black text-[10px]">بانتظار التوقيع الإلكتروني ⌛</span>
+                                      <span className="text-[9px] text-amber-700">رابط التأكيد القانوني مفعل وجاهز للإمضاء</span>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1.5 text-slate-500 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
+                                    <FileSignature className="w-3.5 h-3.5 text-slate-400" />
+                                    <span className="font-bold text-[10px]">بدون توقيع رقمي</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Action Buttons for Digital Signature */}
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {note.signatureStatus === "signed" && note.signatureData && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setViewingCertificateNote(note)}
+                                    className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[10px] rounded-lg transition flex items-center gap-1 shadow-sm"
+                                  >
+                                    <Award className="w-3 h-3" />
+                                    <span>شهادة التوقيع 📜</span>
+                                  </button>
+                                )}
+
+                                {note.signatureStatus === "pending" && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => setSigningNotePortal(note)}
+                                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] rounded-lg transition flex items-center gap-1 shadow-sm"
+                                    >
+                                      <PenTool className="w-3 h-3" />
+                                      <span>توقيع الآن ✍️</span>
+                                    </button>
+                                    
+                                    {note.confirmationLink && (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            navigator.clipboard.writeText(note.confirmationLink!);
+                                            setCopiedNoteLinkId(note.id);
+                                            setTimeout(() => setCopiedNoteLinkId(null), 2500);
+                                          }}
+                                          className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-[10px] rounded-lg transition flex items-center gap-1 border border-slate-200"
+                                        >
+                                          {copiedNoteLinkId === note.id ? (
+                                            <>
+                                              <Check className="w-3 h-3 text-emerald-600" />
+                                              <span className="text-emerald-700 font-black">تم النسخ!</span>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Copy className="w-3 h-3 text-slate-600" />
+                                              <span>نسخ الرابط</span>
+                                            </>
+                                          )}
+                                        </button>
+
+                                        <a
+                                          href={`https://wa.me/?text=${encodeURIComponent(`السلام عليكم، يرجى التكرم بالاطلاع والتوقيع الإلكتروني على المذكرة القانونية من ديوان المحاماة:\n${note.confirmationLink}`)}`}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="p-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition"
+                                          title="مشاركة عبر الواتساب"
+                                        >
+                                          <Share2 className="w-3 h-3" />
+                                        </a>
+                                      </>
+                                    )}
+                                  </>
+                                )}
+
+                                {(!note.signatureStatus || note.signatureStatus === "none") && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setRequestSignatureModalNote(note)}
+                                    className="px-2 py-1 bg-slate-100 hover:bg-amber-100 hover:text-amber-900 text-slate-700 font-bold text-[9.5px] rounded-lg transition flex items-center gap-1 border border-slate-200"
+                                  >
+                                    <FileSignature className="w-3 h-3 text-amber-600" />
+                                    <span>طلب توقيع رقمي</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
                             {/* Attorney Response Section if available */}
                             {note.attorneyReply && (
-                              <div className="p-2 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-900 space-y-0.5 text-right">
+                              <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 space-y-0.5 text-right">
                                 <div className="flex items-center justify-start gap-1.5 flex-wrap">
                                   <span className="text-[9px] font-black text-emerald-800 flex items-center gap-1">
                                     <span>⚖️</span>
@@ -2145,7 +2767,7 @@ export default function App() {
                               </div>
                             )}
 
-                            <div className="flex justify-between items-center border-t border-slate-200/50 pt-1.5 mt-0.5 text-[9.5px]">
+                            <div className="flex justify-between items-center border-t border-slate-200/60 pt-1.5 mt-0.5 text-[9.5px]">
                               {note.referencedCaseId ? (
                                 <span className="text-blue-700 font-bold">📁 مرتبطة بملف قضية مفعلة</span>
                               ) : (
@@ -2208,10 +2830,23 @@ export default function App() {
                     type="button"
                     disabled={!editedClientNote.trim()}
                     onClick={() => {
-                      handleClientNoteSubmit(currentUser?.name || "الموكل المعتمد", editedClientNote, notePriority, requestSmsReminder, referencedCaseId, noteCategory, noteLinkedAttachments);
+                      handleClientNoteSubmit(
+                        currentUser?.name || "الموكل المعتمد", 
+                        editedClientNote, 
+                        notePriority, 
+                        requestSmsReminder, 
+                        referencedCaseId, 
+                        noteCategory, 
+                        noteLinkedAttachments,
+                        requestDigitalSignature,
+                        signatureClientPhone,
+                        signatureLegalAffirmation
+                      );
                       setEditedClientNote("");
                       setNoteLinkedAttachments([]);
                       setNoteCategory("Consultation");
+                      setRequestDigitalSignature(false);
+                      setSignatureClientPhone("");
                       localStorage.removeItem("law_clientNoteDraft");
                       localStorage.removeItem("law_clientNoteDraft_time");
                       setNoteAutoSaveStatus("idle");
@@ -2229,6 +2864,137 @@ export default function App() {
                 </div>
               </div>
             </div>
+
+            {/* Signature Modals embedded inside Client Note Flow */}
+            {requestSignatureModalNote && (
+              <RequestSignatureLinkModal
+                isOpen={!!requestSignatureModalNote}
+                onClose={() => setRequestSignatureModalNote(null)}
+                currentUser={currentUser}
+                note={{
+                  id: requestSignatureModalNote.id,
+                  title: `مذكرة موكل: ${requestSignatureModalNote.clientName}`,
+                  content: requestSignatureModalNote.text,
+                  category: "Client Docket Memo",
+                  createdAt: requestSignatureModalNote.date,
+                  updatedAt: requestSignatureModalNote.date,
+                  isPinned: false,
+                  color: "amber",
+                  tags: ["موكل", "مذكرة"],
+                  clientName: requestSignatureModalNote.clientName,
+                  clientPhone: requestSignatureModalNote.clientPhone,
+                  requiresSignature: true,
+                  signatureStatus: requestSignatureModalNote.signatureStatus,
+                  confirmationLink: requestSignatureModalNote.confirmationLink,
+                  confirmationToken: requestSignatureModalNote.confirmationToken
+                }}
+                clients={clients}
+                cases={cases}
+                onRequestCompleted={(updatedKeepNote) => {
+                  handleUpdateClientNote(requestSignatureModalNote.id, {
+                    requiresSignature: true,
+                    signatureStatus: "pending",
+                    signatureRequestedBy: "lawyer",
+                    signatureRequestedAt: new Date().toISOString(),
+                    confirmationToken: updatedKeepNote.confirmationToken,
+                    confirmationLink: updatedKeepNote.confirmationLink,
+                    clientPhone: updatedKeepNote.clientPhone
+                  });
+                  setRequestSignatureModalNote(null);
+                }}
+              />
+            )}
+
+            {signingNotePortal && (
+              <ClientSignatureConfirmationPortal
+                isOpen={!!signingNotePortal}
+                onClose={() => setSigningNotePortal(null)}
+                note={{
+                  id: signingNotePortal.id,
+                  title: `مذكرة موكل: ${signingNotePortal.clientName}`,
+                  content: signingNotePortal.text,
+                  category: "Client Docket Memo",
+                  createdAt: signingNotePortal.date,
+                  updatedAt: signingNotePortal.date,
+                  isPinned: false,
+                  color: "amber",
+                  tags: ["موكل", "مذكرة"],
+                  clientName: signingNotePortal.clientName,
+                  clientPhone: signingNotePortal.clientPhone,
+                  requiresSignature: true,
+                  signatureStatus: signingNotePortal.signatureStatus,
+                  confirmationLink: signingNotePortal.confirmationLink,
+                  confirmationToken: signingNotePortal.confirmationToken,
+                  signatureData: signingNotePortal.signatureData
+                }}
+                onSignComplete={(signedNote) => {
+                  handleUpdateClientNote(signingNotePortal.id, {
+                    signatureStatus: "signed",
+                    signatureData: signedNote.signatureData
+                  });
+                  setSigningNotePortal(null);
+                }}
+              />
+            )}
+
+            {viewingCertificateNote && viewingCertificateNote.signatureData && (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200 text-right">
+                <div className="bg-white dark:bg-slate-900 border-2 border-amber-500/40 rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                  <div className="p-4 bg-slate-900 text-white flex justify-between items-center border-b border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-6 h-6 text-amber-400" />
+                      <div>
+                        <h3 className="text-sm font-black">شهادة التوقيع الإلكتروني والبصمة الرقمية المعتمدة</h3>
+                        <p className="text-[10px] text-slate-400">وثيقة إثبات هوية وتصديق قانوني صادر عن ديوان المحاماة</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setViewingCertificateNote(null)}
+                      className="p-1.5 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-white transition"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <div className="p-6 overflow-y-auto space-y-6 font-sans">
+                    <LawyerSignatureSeal
+                      signedBy={viewingCertificateNote.signatureData.signedBy}
+                      signedAt={viewingCertificateNote.signatureData.signedAt}
+                      verificationHash={viewingCertificateNote.signatureData.verificationHash}
+                      lawyerName={viewingCertificateNote.signatureData.lawyerSignatureName || "الأستاذ وسام أحمد الشناوي"}
+                      nationalId={viewingCertificateNote.signatureData.nationalId}
+                      digitalStamp="ديوان المحاماة والاستشارات القانونية - محكمة النقض"
+                      signatureImage={viewingCertificateNote.signatureData.signatureImage}
+                    />
+
+                    <div className="p-4 bg-slate-50 dark:bg-slate-850 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs space-y-2">
+                      <span className="font-black text-slate-900 dark:text-white block">نص المذكرة المصادق عليها:</span>
+                      <p className="text-slate-700 dark:text-slate-300 leading-relaxed font-medium bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
+                        {viewingCertificateNote.text}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-slate-50 dark:bg-slate-850 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => window.print()}
+                      className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl flex items-center gap-2 transition"
+                    >
+                      <Printer className="w-4 h-4 text-amber-400" />
+                      <span>طباعة الشهادة الرسمية 🖨️</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewingCertificateNote(null)}
+                      className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl transition"
+                    >
+                      إغلاق
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Attachment Gallery Modal (Nested Pop-over) */}
             {showAttachmentGallery && (
@@ -2357,6 +3123,14 @@ export default function App() {
           {renderActiveView()}
         </div>
 
+        {currentUser && (
+        <AiVoiceAssistantLauncher
+          onOpenAiAssistant={() => setActiveSection("ai")}
+          onOpenLegalAnalysis={() => setActiveSection("legal_analysis")}
+          onOpenSmartOcr={() => setActiveSection("smart_ocr")}
+          language={language}
+        />
+      )}
       </main>
 
       {/* Global Comprehensive Search Modal Engine (Cases, Documents, Clients, Sessions, Fees, Law Codes) */}

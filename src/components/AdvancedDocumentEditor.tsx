@@ -1,6 +1,7 @@
 import React, { useState, useRef } from "react";
 import { CaseRecord, ClientProfile, PlatformUser } from "../types";
 import GoldenEagleEmblem from "./GoldenEagleEmblem";
+import { getClientRoleLabel } from "../utils/translations";
 import {
   FileText,
   Save,
@@ -66,8 +67,8 @@ const LEGAL_TEMPLATES = [
 أصلياً: بالبراءة ورفض الدعوى المدنية وإلزام رافعها بالمصروفات ومقابل أتعاب المحاماة.
 احتياطياً: إعادة الدعوى لمكتب الخبراء / التحقيق لتحقيق عناصر النزاع.
 
-وكيل الموكل
-الأستاذ / وسام حمدي الشناوي
+وكيل [صفة الموكل: المدعي / المتهم / المستأنف / الموكل]
+الأستاذ / المحامي
 المحامي بالنقض والدستورية العليا`
   },
   {
@@ -77,7 +78,7 @@ const LEGAL_TEMPLATES = [
     content: `بسم الله الرحمن الرحيم
 
 إنه في يوم [اليوم] الموافق [تاريخ اليوم]
-بناءً على طلب السيد / [اسم الموكل]، ومحله المختار مكتب الأستاذ وسام حمدي الشناوي المحامي بالنقض.
+بناءً على طلب السيد / [اسم الموكل]، ومحله المختار مكتب الأستاذ المحامي المحامي بالنقض.
 
 أنا [اسم المحضر] محضر محكمة [المحكمة المختصة] الجزئية قد انتقلت وأعلنت:
 السيد / [اسم الخصم]، المقيم في [عنوان الخصم].
@@ -100,7 +101,7 @@ const LEGAL_TEMPLATES = [
     content: `بسم الله الرحمن الرحيم
 
 إنه في يوم [اليوم] الموافق [تاريخ اليوم]
-بناءً على طلب السيد / [اسم الموكل]، ومحله المختار مكتب الأستاذ وسام حمدي الشناوي المحامي.
+بناءً على طلب السيد / [اسم الموكل]، ومحله المختار مكتب الأستاذ المحامي المحامي.
 
 أنا [اسم المحضر] محضر محكمة [المحكمة المختصة] قد انتقلت في تاريخه إلى حيث إقامة:
 السيد / [اسم المنذر إليه]، المقيم في [عنوان المنذر إليه].
@@ -124,7 +125,7 @@ const LEGAL_TEMPLATES = [
 عقد اتفاق أتعاب ومباشرة دعاوى قانونية
 
 إنه في يوم [اليوم] الموافق [التاريخ]، تم الاتفاق والتراضي بين كل من:
-الطرف الأول: الأستاذ وسام حمدي الشناوي - المحامي بالنقض والدستورية العليا. (الوكيل)
+الطرف الأول: الأستاذ المحامي - المحامي بالنقض والدستورية العليا. (الوكيل)
 الطرف الثاني: السيد / [اسم الموكل]، بطاقة رقم [الرقم القومي]. (الموكل)
 
 البند الأول (موضوع الوكالة):
@@ -161,6 +162,15 @@ export default function AdvancedDocumentEditor({
   const [copied, setCopied] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  // Editor Ref for contentEditable
+  const editorRef = useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (editorRef.current && editorRef.current.innerHTML !== docContent) {
+      editorRef.current.innerHTML = docContent;
+    }
+  }, [docContent]);
+
   // Apply Template
   const handleApplyTemplate = (templateId: string) => {
     const tmpl = LEGAL_TEMPLATES.find(t => t.id === templateId);
@@ -188,7 +198,14 @@ export default function AdvancedDocumentEditor({
       updated = updated.replace(/\[المحكمة المختصة\]/g, cs.competentCourt || "محكمة جنوب القاهرة الابتدائية");
       updated = updated.replace(/\[اسم الخصم\]/g, cs.opponentName || "الخصم المعلن إليه");
       if (cs.nextSessionDate) updated = updated.replace(/\[تاريخ الجلسة\]/g, cs.nextSessionDate);
+      if (cs.clientRole) {
+        updated = updated.replace(/\[المدعي \/ المتهم\]/g, cs.clientRole);
+        updated = updated.replace(/\[صفة الموكل: المدعي \/ المتهم \/ المستأنف \/ الموكل\]/g, cs.clientRole);
+        updated = updated.replace(/وكيل \[صفة الموكل: المدعي \/ المتهم \/ المستأنف \/ الموكل\]/g, getClientRoleLabel(cs.clientRole, cs, language));
+      }
     }
+
+    updated = updated.replace(/وكيل الموكل/g, getClientRoleLabel(cs?.clientRole, cs, language));
 
     const todayStr = new Date().toLocaleDateString("ar-EG", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
     updated = updated.replace(/\[تاريخ اليوم\]/g, todayStr);
@@ -316,9 +333,9 @@ export default function AdvancedDocumentEditor({
         <body>
           <div class="header-banner">
             <div class="title-block">
-              <h1>مكتب الأستاذ وسام حمدي الشناوي</h1>
+              <h1>مكتب الأستاذ / ${currentUser.name}</h1>
               <p>المحامي بالنقض والدستورية العليا - ديوان الإفتاء والقضايا</p>
-              <p>هاتف: 01283233555 | بريد: wesam.elshenawey.law@gmail.com</p>
+              <p>هاتف: ${currentUser.phone} | ديوان الإفتاء والقضايا</p>
             </div>
             <div style="text-align: left; font-size: 10pt; color: #92400e; font-weight: bold;">
               <span>تاريخ التحرير: ${new Date().toLocaleDateString("ar-EG")}</span>
@@ -326,10 +343,9 @@ export default function AdvancedDocumentEditor({
           </div>
 
           <div class="doc-body">${docContent}</div>
-
           <div class="footer-seal">
             <div>محرر بواسطة المنظومة الرقمية للمكتب القضائي الذكي</div>
-            <div>توقيع الأستاذ وسام الشناوي المحامي بالنقض</div>
+            <div>توقيع الأستاذ / ${currentUser.name} المحامي</div>
           </div>
         </body>
       </html>
@@ -493,17 +509,60 @@ export default function AdvancedDocumentEditor({
             />
           </div>
 
+          {/* Word-like Formatting Toolbar */}
+          <div className="flex flex-wrap items-center gap-1.5 p-2 bg-slate-100 dark:bg-slate-900 border-x border-t border-slate-200 dark:border-slate-800 rounded-t-2xl">
+            <button type="button" onClick={() => document.execCommand('bold')} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-700 dark:text-slate-200" title="عريض (Ctrl+B)">
+              <Bold className="w-4 h-4" />
+            </button>
+            <button type="button" onClick={() => document.execCommand('italic')} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-700 dark:text-slate-200" title="مائل (Ctrl+I)">
+              <Italic className="w-4 h-4" />
+            </button>
+            <button type="button" onClick={() => document.execCommand('underline')} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-700 dark:text-slate-200" title="تسطير (Ctrl+U)">
+              <Underline className="w-4 h-4" />
+            </button>
+            <div className="w-px h-5 bg-slate-300 dark:bg-slate-700 mx-1"></div>
+            <button type="button" onClick={() => document.execCommand('justifyRight')} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-700 dark:text-slate-200" title="محاذاة لليمين">
+              <AlignRight className="w-4 h-4" />
+            </button>
+            <button type="button" onClick={() => document.execCommand('justifyCenter')} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-700 dark:text-slate-200" title="توسيط">
+              <AlignCenter className="w-4 h-4" />
+            </button>
+            <button type="button" onClick={() => document.execCommand('justifyLeft')} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-700 dark:text-slate-200" title="محاذاة لليسار">
+              <AlignLeft className="w-4 h-4" />
+            </button>
+            <div className="w-px h-5 bg-slate-300 dark:bg-slate-700 mx-1"></div>
+            <button type="button" onClick={() => document.execCommand('insertUnorderedList')} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-700 dark:text-slate-200" title="قائمة نقطية">
+              <List className="w-4 h-4" />
+            </button>
+            <button type="button" onClick={() => document.execCommand('insertOrderedList')} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-700 dark:text-slate-200" title="قائمة رقمية">
+              <ListOrdered className="w-4 h-4" />
+            </button>
+            <div className="w-px h-5 bg-slate-300 dark:bg-slate-700 mx-1"></div>
+            <button type="button" onClick={() => {
+                const color = prompt("أدخل لون النص (مثال: red أو #ff0000):", "#000000");
+                if(color) document.execCommand('foreColor', false, color);
+              }} 
+              className="px-2 py-1 text-[11px] hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-700 dark:text-slate-200 font-bold"
+            >
+              لون النص
+            </button>
+            <button type="button" onClick={() => document.execCommand('undo')} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-700 dark:text-slate-200" title="تراجع (Ctrl+Z)">
+              <Undo className="w-4 h-4" />
+            </button>
+          </div>
+
           {/* Document Content Textarea */}
-          <div className="relative">
-            <textarea
-              rows={22}
-              value={docContent}
-              onChange={(e) => setDocContent(e.target.value)}
-              className="w-full p-5 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm leading-loose outline-none focus:border-amber-500 font-serif text-right shadow-inner resize-y transition"
-              placeholder="اكتب أو الصق نصوص المستند القضائي هنا..."
+          <div className="relative border-x border-b border-slate-200 dark:border-slate-800 rounded-b-2xl bg-white dark:bg-slate-950 overflow-hidden shadow-inner">
+            <div
+              ref={editorRef}
+              contentEditable
+              onInput={(e) => setDocContent(e.currentTarget.innerHTML)}
+              className="w-full p-6 text-slate-900 dark:text-slate-100 text-sm leading-loose outline-none focus:ring-inset focus:ring-2 focus:ring-amber-500 font-serif text-right min-h-[500px]"
+              dir="rtl"
+              style={{ whiteSpace: 'pre-wrap' }}
             />
             
-            <div className="absolute bottom-3 left-4 text-[10px] text-slate-400 font-mono">
+            <div className="absolute bottom-3 left-4 text-[10px] text-slate-400 font-mono bg-white/80 dark:bg-slate-950/80 px-2 rounded backdrop-blur-sm">
               عدد الكلمات: {docContent.trim() ? docContent.trim().split(/\s+/).length : 0} | الأحرف: {docContent.length}
             </div>
           </div>
@@ -581,7 +640,7 @@ export default function AdvancedDocumentEditor({
           {/* Official Law Office Watermark Box */}
           <div className="bg-gradient-to-b from-slate-900 to-slate-950 p-4 rounded-3xl border border-amber-500/30 text-center space-y-2">
             <GoldenEagleEmblem size="md" />
-            <span className="text-xs font-black text-amber-400 block">ديوان الأستاذ وسام الشناوي</span>
+            <span className="text-xs font-black text-amber-400 block">ديوان مكتب المحامي / {currentUser.name}</span>
             <p className="text-[10px] text-slate-400">ترويسة الطباعة الرسمية مفعلة ومعتمدة تلقائياً في كافة المستندات الصادرة.</p>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import PhoneInputWithCountry from "./PhoneInputWithCountry";
 import { PlatformUser, UserRole } from "../types";
 import { TRANSLATIONS } from "../utils/translations";
 import { License } from "../utils/firebaseSync";
@@ -51,21 +52,67 @@ export default function LoginView({
   licenses,
   onBindPhoneToLicense
 }: LoginProps) {
+  // Main Dual Portal State (1: Lawyers & Admin, 2: Clients & Users)
+  const [activePortal, setActivePortal] = useState<"lawyers_admin" | "clients_users">("lawyers_admin");
+
   const [activeTab, setActiveTab] = useState<UserRole>(UserRole.ADMIN);
   const [phone, setPhone] = useState("");
+  const [phoneCode, setPhoneCode] = useState("+20");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
+  // Quick autofill helper for admin
+  const handleQuickAdminFill = () => {
+    setPhoneCode("+20");
+    setPhone("1283233555");
+    setPassword("W-001*001");
+    setErrorMsg("");
+  };
+
+  // When portal changes, set appropriate default role
+  const handlePortalSwitch = (portal: "lawyers_admin" | "clients_users") => {
+    setActivePortal(portal);
+    setErrorMsg("");
+    setIsSignUp(false);
+    if (portal === "lawyers_admin") {
+      setActiveTab(UserRole.ADMIN);
+    } else {
+      setActiveTab(UserRole.CLIENT);
+    }
+  };
+
   // SignUp Form States
   const [isSignUp, setIsSignUp] = useState(false);
+  const [wizardStep, setWizardStep] = useState(1);
   const [signupName, setSignupName] = useState("");
   const [signupPhone, setSignupPhone] = useState("");
+  const [signupPhoneCode, setSignupPhoneCode] = useState("+20");
+  const [lawFirmPhone, setLawFirmPhone] = useState("");
+  const [lawFirmPhoneCode, setLawFirmPhoneCode] = useState("+20");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupLicenseKey, setSignupLicenseKey] = useState("");
   const [signupGoogle, setSignupGoogle] = useState("");
   const [signupFb, setSignupFb] = useState("");
   const [signupWa, setSignupWa] = useState("");
+  
+  
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, setter: React.Dispatch<React.SetStateAction<string>>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setter(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Registration Documents (Lawyers)
+  const [nationalIdFront, setNationalIdFront] = useState("");
+  const [nationalIdBack, setNationalIdBack] = useState("");
+  const [lawyerCard, setLawyerCard] = useState("");
+  
   const [showVerification, setShowVerification] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
   const [generatedCode, setGeneratedCode] = useState("");
@@ -73,6 +120,7 @@ export default function LoginView({
   // Forgot Password States
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetPhone, setResetPhone] = useState("");
+  const [resetPhoneCode, setResetPhoneCode] = useState("+20");
   const [resetCode, setResetCode] = useState("");
   const [generatedResetCode, setGeneratedResetCode] = useState("");
   const [resetStep, setResetStep] = useState<"phone" | "verify" | "new_password">("phone");
@@ -87,17 +135,21 @@ export default function LoginView({
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
+    
+    const fullPhone = phoneCode + phone;
 
-    // Admin default direct validation matching credentials
-    if (activeTab === UserRole.ADMIN) {
-      if (phone === "01283233555" && password === "W-001*001") {
+    // Portal 1: Lawyers & Admin
+    if (activePortal === "lawyers_admin") {
+      // Admin default direct validation matching credentials
+      if ((phone === "1283233555" || phone === "01283233555" || fullPhone === "+201283233555") && password === "W-001*001") {
         const adminUser: PlatformUser = {
           id: "usr-admin",
-          name: language === "ar" ? "الأستاذ وسام حمدي الشناوي" : "Advocate Wesam Hamdy Al-Shenawey",
-          phone: "01283233555",
+          name: language === "ar" ? "مدير النظام (مكتب محامي رقمي)" : "System Admin (Digital Law Firm)",
+          phone: "+201283233555",
           passwordHash: "W-001*001",
           role: UserRole.ADMIN,
           isVerified: true,
+          officeId: "office-admin",
           createdAt: new Date().toISOString(),
           permissions: {
             canEditApp: true,
@@ -106,31 +158,53 @@ export default function LoginView({
         };
         onLoginSuccess(adminUser);
         return;
-      } else {
-        setErrorMsg(language === "ar" 
-          ? "رقم هاتف المدير أو كلمة المرور المدخلة غير صحيحة." 
-          : "Admin phone or password credentials mismatch.");
+      }
+      
+      // Check for Admin/Staff users
+      const matchedUser = registeredUsers.find(
+        (u) => (u.phone === fullPhone || u.phone === phone) && u.passwordHash === password && [UserRole.ADMIN, UserRole.STAFF].includes(u.role)
+      );
+
+      if (matchedUser) {
+        if (!matchedUser.isVerified) {
+          setErrorMsg(language === "ar" ? "رقم الهاتف غير مفعل بعد." : "This account phone is not verified yet.");
+          return;
+        }
+        onLoginSuccess(matchedUser);
         return;
       }
+
+      setErrorMsg(language === "ar" 
+        ? "بيانات الدخول غير صحيحة للإدارة أو المحامين." 
+        : "Credentials mismatch for Admin/Staff portal.");
+      return;
     }
 
-    // Standard logins (Client, Seeker, Opponent roles)
-    const matchedUser = registeredUsers.find(
-      (u) => u.phone === phone && u.passwordHash === password && u.role === activeTab
-    );
+    // Portal 2: Clients & Users (Client, Seeker, Opponent roles)
+    if (activePortal === "clients_users") {
+      const matchedUser = registeredUsers.find(
+        (u) => (u.phone === fullPhone || u.phone === phone) && 
+               u.passwordHash === password && 
+               [UserRole.CLIENT, UserRole.SEEKER, UserRole.OPPONENT].includes(u.role) &&
+               u.lawFirmPhone === (lawFirmPhoneCode + lawFirmPhone)
+      );
 
-    if (matchedUser) {
-      if (!matchedUser.isVerified) {
-        setErrorMsg(language === "ar" ? "رقم الهاتف غير مفعل بعد." : "This account phone is not verified yet.");
+      if (matchedUser) {
+        if (!matchedUser.isVerified) {
+          setErrorMsg(language === "ar" ? "رقم الهاتف غير مفعل بعد." : "This account phone is not verified yet.");
+          return;
+        }
+        onLoginSuccess(matchedUser);
         return;
       }
-      onLoginSuccess(matchedUser);
-    } else {
+
       setErrorMsg(language === "ar" 
-        ? "رقم الهاتف أو كلمة السر غير مطابقة لهذه الفئة." 
-        : "Credentials Mismatch. Please check phone, password and tab selected.");
+        ? "رقم الهاتف أو كلمة السر غير مطابقة لبيانات الموكلين." 
+        : "Credentials Mismatch. Please check phone and password.");
     }
   };
+
+  const getSocialDefaultRole = () => activePortal === "lawyers_admin" ? UserRole.STAFF : UserRole.CLIENT;
 
   // Google Firebase Authentication Sign-In
   const handleGoogleSignIn = async () => {
@@ -143,7 +217,7 @@ export default function LoginView({
           name: "مستخدم حساب Google",
           phone: "01000000000",
           passwordHash: "oauth_authenticated",
-          role: activeTab === UserRole.ADMIN ? UserRole.CLIENT : activeTab,
+          role: getSocialDefaultRole(),
           isVerified: true,
           googleAccount: "user@gmail.com",
           createdAt: new Date().toISOString()
@@ -166,7 +240,7 @@ export default function LoginView({
           email: user.email || undefined,
           phone: user.phoneNumber || "01" + Math.floor(100000000 + Math.random() * 900000000),
           passwordHash: "oauth_authenticated",
-          role: activeTab === UserRole.ADMIN ? UserRole.CLIENT : activeTab,
+          role: getSocialDefaultRole(),
           isVerified: true,
           googleAccount: user.email || undefined,
           createdAt: new Date().toISOString()
@@ -182,7 +256,7 @@ export default function LoginView({
         name: "مستخدم حساب Google",
         phone: "010" + Math.floor(10000000 + Math.random() * 90000000),
         passwordHash: "oauth_authenticated",
-        role: activeTab === UserRole.ADMIN ? UserRole.CLIENT : activeTab,
+        role: getSocialDefaultRole(),
         isVerified: true,
         googleAccount: "user@gmail.com",
         createdAt: new Date().toISOString()
@@ -202,7 +276,7 @@ export default function LoginView({
           name: "مستخدم حساب Facebook",
           phone: "011" + Math.floor(10000000 + Math.random() * 90000000),
           passwordHash: "oauth_authenticated",
-          role: activeTab === UserRole.ADMIN ? UserRole.CLIENT : activeTab,
+          role: getSocialDefaultRole(),
           isVerified: true,
           facebookAccount: "facebook_user",
           createdAt: new Date().toISOString()
@@ -255,17 +329,31 @@ export default function LoginView({
       return;
     }
 
-    if (signupPhone.length < 10) {
+    if (activePortal === "lawyers_admin") {
+      if (!nationalIdFront || !nationalIdBack || !lawyerCard) {
+        setErrorMsg(language === "ar" ? "لتسجيل مكتب محامي رقمي، يشترط إرفاق صور البطاقة وكارنيه المحاماة." : "For Law Firm registration, National ID and Lawyer Card are required.");
+        return;
+      }
+    } else {
+      if (!lawFirmPhone) {
+        setErrorMsg(language === "ar" ? "يرجى كتابة رقم هاتف صاحب مكتب المحاماة لربط الحساب." : "Please enter the Law Firm Owner's phone number.");
+        return;
+      }
+    }
+
+    if (signupPhone.length < 9) {
       setErrorMsg(language === "ar" ? "يرجى كتابة رقم هاتف صحيح." : "Please enter a valid mobile phone.");
       return;
     }
+
+    const fullSignupPhone = signupPhoneCode + signupPhone;
 
     if (signupLicenseKey.trim()) {
       const targetLic = licenses.find(l => l.id === signupLicenseKey.trim().toUpperCase());
       if (!targetLic) {
         setErrorMsg(language === "ar" 
-          ? "رمز ترخيص النسخة هذا غير موجود. يرجى مراجعة الأستاذ وسام." 
-          : "Invalid activation License key. Request a legitimate copy from Advocate Wesam.");
+          ? "رمز ترخيص النسخة هذا غير موجود." 
+          : "Invalid activation License key.");
         return;
       }
       if (targetLic.status !== "active") {
@@ -274,9 +362,9 @@ export default function LoginView({
       }
 
       const activeUsersCount = targetLic.registeredPhones.length;
-      if (activeUsersCount >= targetLic.maxUsers && !targetLic.registeredPhones.includes(signupPhone)) {
+      if (activeUsersCount >= targetLic.maxUsers && !targetLic.registeredPhones.includes(fullSignupPhone)) {
         setErrorMsg(language === "ar" 
-          ? `عذراً، تم بلوغ الحد الأقصى للمستخدمين لهذه النسخة (الحد الأقصى: ${targetLic.maxUsers} مستخدم). الرجاء التواصل مع الأستاذ وسام للترقية.`
+          ? `عذراً، تم بلوغ الحد الأقصى للمستخدمين لهذه النسخة (الحد الأقصى: ${targetLic.maxUsers} مستخدم). الرجاء التواصل للترقية.`
           : `User register limit exceeded for this copy (Limit: ${targetLic.maxUsers} users). Ask Admin to upgrade copy.`);
         return;
       }
@@ -290,17 +378,23 @@ export default function LoginView({
 
   const handleVerifyAndFinish = () => {
     if (verificationCode === generatedCode || verificationCode === "1111") {
+      const fullSignupPhone = signupPhoneCode + signupPhone;
       if (signupLicenseKey.trim()) {
-        onBindPhoneToLicense(signupLicenseKey.trim().toUpperCase(), signupPhone);
+        onBindPhoneToLicense(signupLicenseKey.trim().toUpperCase(), fullSignupPhone);
       }
 
       const newUser: PlatformUser = {
         id: "usr-" + Date.now(),
         name: signupName,
-        phone: signupPhone,
+        phone: fullSignupPhone,
         passwordHash: signupPassword,
         role: activeTab === UserRole.ADMIN ? UserRole.CLIENT : activeTab,
         isVerified: true,
+        officeId: activePortal === "lawyers_admin" ? "office-" + Date.now() : undefined,
+        nationalIdFront: nationalIdFront || undefined,
+        nationalIdBack: nationalIdBack || undefined,
+        lawyerCard: lawyerCard || undefined,
+        lawFirmPhone: activePortal === "clients_users" ? (lawFirmPhoneCode + lawFirmPhone) : undefined,
         googleAccount: signupGoogle || undefined,
         facebookAccount: signupFb || undefined,
         whatsAppAccount: signupWa || undefined,
@@ -325,7 +419,7 @@ export default function LoginView({
   // Password Reset Flow
   const handleRequestPasswordReset = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!resetPhone || resetPhone.length < 10) {
+    if (!resetPhone || resetPhone.length < 9) {
       alert("يرجى إدخال رقم هاتف صحيح مسجل بالنظام.");
       return;
     }
@@ -349,9 +443,10 @@ export default function LoginView({
       return;
     }
 
+    const fullResetPhone = resetPhoneCode + resetPhone;
     const users = JSON.parse(localStorage.getItem("law_users") || "[]");
     const updatedUsers = users.map((u: PlatformUser) => 
-      u.phone === resetPhone ? { ...u, passwordHash: newPassword } : u
+      (u.phone === fullResetPhone || u.phone === resetPhone) ? { ...u, passwordHash: newPassword } : u
     );
     localStorage.setItem("law_users", JSON.stringify(updatedUsers));
 
@@ -409,64 +504,40 @@ export default function LoginView({
         </div>
       </div>
 
-      {/* Login Card */}
+      {/* Login Card with Dual Portals */}
       <div className="mt-6 max-w-lg w-full z-10 shadow-2xl rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
         
-        {/* Role Tab Selector */}
-        {!isSignUp && (
-          <div className="flex border-b border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-sans text-xs">
-            <button
-              onClick={() => { setActiveTab(UserRole.ADMIN); setErrorMsg(""); }}
-              className={`flex-1 py-3.5 font-black transition-all cursor-pointer ${
-                activeTab === UserRole.ADMIN
-                  ? "border-b-2 border-amber-600 text-amber-800 dark:text-amber-500 bg-white dark:bg-slate-900"
-                  : "text-slate-500 dark:text-slate-400 hover:text-slate-800"
-              }`}
-            >
-              {t("login_tab_admin")}
-            </button>
-            <button
-              onClick={() => { setActiveTab(UserRole.STAFF); setErrorMsg(""); }}
-              className={`flex-1 py-3.5 font-black transition-all cursor-pointer ${
-                activeTab === UserRole.STAFF
-                  ? "border-b-2 border-amber-600 text-amber-800 dark:text-amber-500 bg-white dark:bg-slate-900"
-                  : "text-slate-500 dark:text-slate-400 hover:text-slate-800"
-              }`}
-            >
-              {t("login_tab_lawyer")}
-            </button>
-            <button
-              onClick={() => { setActiveTab(UserRole.CLIENT); setErrorMsg(""); }}
-              className={`flex-1 py-3.5 font-black transition-all cursor-pointer ${
-                activeTab === UserRole.CLIENT
-                  ? "border-b-2 border-amber-600 text-amber-800 dark:text-amber-500 bg-white dark:bg-slate-900"
-                  : "text-slate-500 dark:text-slate-400 hover:text-slate-800"
-              }`}
-            >
-              {t("login_tab_client")}
-            </button>
-            <button
-              onClick={() => { setActiveTab(UserRole.SEEKER); setErrorMsg(""); }}
-              className={`flex-1 py-3.5 font-black transition-all cursor-pointer ${
-                activeTab === UserRole.SEEKER
-                  ? "border-b-2 border-amber-600 text-amber-800 dark:text-amber-500 bg-white dark:bg-slate-900"
-                  : "text-slate-500 dark:text-slate-400 hover:text-slate-800"
-              }`}
-            >
-              {t("login_tab_seeker")}
-            </button>
-            <button
-              onClick={() => { setActiveTab(UserRole.OPPONENT); setErrorMsg(""); }}
-              className={`flex-1 py-3.5 font-black transition-all cursor-pointer ${
-                activeTab === UserRole.OPPONENT
-                  ? "border-b-2 border-amber-600 text-amber-800 dark:text-amber-500 bg-white dark:bg-slate-900"
-                  : "text-slate-500 dark:text-slate-400 hover:text-slate-800"
-              }`}
-            >
-              {t("login_tab_opponent")}
-            </button>
-          </div>
-        )}
+        {/* 1. Main Dual Portals Header Switcher */}
+        <div className="grid grid-cols-2 border-b border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950 p-1.5 gap-1.5 font-sans">
+          
+          {/* Portal 1: Lawyers & Admin */}
+          <button
+            type="button"
+            onClick={() => handlePortalSwitch("lawyers_admin")}
+            className={`py-3 px-2 rounded-2xl font-black text-xs transition-all flex items-center justify-center gap-2 cursor-pointer ${
+              activePortal === "lawyers_admin"
+                ? "bg-slate-900 text-amber-400 dark:bg-amber-500 dark:text-slate-950 shadow-md ring-1 ring-amber-500/30"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>1- دخول المحامين والإدارة</span>
+          </button>
+
+          {/* Portal 2: Clients & Users */}
+          <button
+            type="button"
+            onClick={() => handlePortalSwitch("clients_users")}
+            className={`py-3 px-2 rounded-2xl font-black text-xs transition-all flex items-center justify-center gap-2 cursor-pointer ${
+              activePortal === "clients_users"
+                ? "bg-slate-900 text-amber-400 dark:bg-amber-500 dark:text-slate-950 shadow-md ring-1 ring-amber-500/30"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+            }`}
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>2- الموكلين والمستخدمين</span>
+          </button>
+        </div>
 
         <div className="p-6 sm:p-8">
           {errorMsg && (
@@ -478,20 +549,33 @@ export default function LoginView({
           {/* NORMAL LOGIN FRAME */}
           {!isSignUp ? (
             <form onSubmit={handleLoginSubmit} className="space-y-4">
+              {activePortal === "clients_users" && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 text-right mb-1">
+                    {language === "ar" ? "رقم هاتف صاحب مكتب المحاماة المستهدف" : "Law Firm Owner's Phone"}
+                  </label>
+                  <PhoneInputWithCountry
+                      required={true}
+                      value={lawFirmPhoneCode + lawFirmPhone}
+                      onChange={(full, code, num) => {
+                        setLawFirmPhoneCode(code);
+                        setLawFirmPhone(num);
+                      }}
+                    />
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 text-right mb-1">
                   {t("phone_label")}
                 </label>
                 <div className="relative">
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder={language === "ar" ? "أدخل رقم الهاتف المسجل (مثال: 01xxxxxxxxx)" : "Enter registered phone"}
-                    className="w-full pl-3 pr-10 py-2.5 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none font-bold text-xs"
-                    required
-                  />
-                  <Phone className="absolute right-3 top-3 w-4 h-4 text-slate-400" />
+                  <PhoneInputWithCountry
+                      value={phoneCode + phone}
+                      onChange={(full, code, num) => {
+                        setPhoneCode(code);
+                        setPhone(num);
+                      }}
+                    />
                 </div>
                 {activeTab === UserRole.ADMIN && (
                   <p className="text-[10px] text-amber-600 dark:text-amber-400 text-right mt-1 font-mono font-bold">
@@ -534,16 +618,45 @@ export default function LoginView({
                     <Eye className="w-4 h-4" />
                   </button>
                 </div>
-                {activeTab === UserRole.ADMIN && (
-                  <p className="text-[10px] text-amber-600 dark:text-amber-400 text-right mt-1 font-mono font-bold">
-                    كلمة مرور المدير: W-001*001
-                  </p>
-                )}
+
               </div>
 
-              <button
-                type="submit"
-                className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl transition shadow-md cursor-pointer"
+              {(activePortal === "lawyers_admin" && wizardStep === 2) && (
+                      <div className="col-span-1 sm:col-span-2 space-y-3 bg-amber-50 dark:bg-amber-950/20 p-4 rounded-xl border border-amber-200 dark:border-amber-800/50">
+                        <div className="flex items-center gap-2 mb-2 text-amber-700 dark:text-amber-500 font-bold">
+                          <span className="w-5 h-5 flex items-center justify-center rounded-full bg-amber-200 dark:bg-amber-800 text-[10px]">2</span>
+                          <span>الوثائق الرسمية (مطلوبة للتوثيق)</span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 leading-relaxed mb-3">
+                          يتم تشفير هذه الوثائق باستخدام معيار Base64 ولا يمكن الوصول إليها إلا بواسطة المالك لضمان سرية النظام.
+                        </p>
+                        <div>
+                          <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-[10px]">صورة بطاقة الرقم القومي (وجه)</label>
+                          <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, setNationalIdFront)} className="w-full text-xs" required />
+                        </div>
+                        <div>
+                          <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-[10px]">صورة بطاقة الرقم القومي (ظهر)</label>
+                          <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, setNationalIdBack)} className="w-full text-xs" required />
+                        </div>
+                        <div>
+                          <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-[10px]">صورة كارنيه المحاماة</label>
+                          <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, setLawyerCard)} className="w-full text-xs" required />
+                        </div>
+                        <div className="flex gap-2 pt-2">
+                          <button type="button" onClick={() => setWizardStep(1)} className="flex-1 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-black text-xs rounded-xl transition cursor-pointer">
+                            رجوع
+                          </button>
+                          <button type="submit" className="flex-1 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl transition cursor-pointer">
+                            إرسال وتوثيق الحساب
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <button
+                      type="submit"
+                      style={{ display: (activePortal === "lawyers_admin" && wizardStep === 2) ? 'none' : 'block' }}
+                      className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl transition shadow-md cursor-pointer"
               >
                 {t("login_btn_submit")}
               </button>
@@ -608,43 +721,85 @@ export default function LoginView({
               {!showVerification ? (
                 <form onSubmit={handleStartSignUp} className="space-y-3.5 text-xs font-sans">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">الاسم الكامل *</label>
-                      <input
-                        type="text"
-                        value={signupName}
-                        onChange={(e) => setSignupName(e.target.value)}
-                        placeholder="الاسم ثلاثياً أو رباعياً"
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none font-bold"
-                        required
-                      />
-                    </div>
+                    {!(activePortal === "lawyers_admin" && wizardStep === 2) && (
+                      <div>
+                        <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">الاسم الكامل *</label>
+                        <input
+                          type="text"
+                          value={signupName}
+                          onChange={(e) => setSignupName(e.target.value)}
+                          placeholder="الاسم ثلاثياً أو رباعياً"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none font-bold"
+                          required
+                        />
+                      </div>
+                    )}
 
                     <div>
+                    <div>
                       <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">رقم الهاتف المحمول *</label>
-                      <input
-                        type="tel"
-                        value={signupPhone}
-                        onChange={(e) => setSignupPhone(e.target.value)}
-                        placeholder="01xxxxxxxxx"
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none font-mono font-bold"
-                        required
-                      />
+                      <PhoneInputWithCountry
+                      value={signupPhoneCode + signupPhone}
+                      onChange={(full, code, num) => {
+                        setSignupPhoneCode(code);
+                        setSignupPhone(num);
+                      }}
+                    />
+                    </div>
+                  </div>
+
+                  {/* Multi-tenant Lawyer & Client Dynamic Fields */}
+                  {activePortal === "lawyers_admin" ? (
+                    <div className="p-3 border border-amber-200 bg-amber-50 dark:bg-amber-900/20 rounded-xl mb-3">
+                      <p className="text-xs font-bold text-amber-800 dark:text-amber-400 mb-2">مستندات توثيق مكتب المحامي (إلزامية)</p>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-[10px]">صورة بطاقة الرقم القومي (وجه)</label>
+                          <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, setNationalIdFront)} className="w-full text-xs" required />
+                        </div>
+                        <div>
+                          <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-[10px]">صورة بطاقة الرقم القومي (ظهر)</label>
+                          <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, setNationalIdBack)} className="w-full text-xs" required />
+                        </div>
+                        <div>
+                          <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-[10px]">صورة كارنيه المحاماة</label>
+                          <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, setLawyerCard)} className="w-full text-xs" required />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 border border-indigo-200 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl mb-3">
+                      <p className="text-xs font-bold text-indigo-800 dark:text-indigo-400 mb-2">ربط الحساب بمكتب المحامي</p>
+                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-[10px]">رقم هاتف صاحب مكتب المحاماة *</label>
+                      <PhoneInputWithCountry
+                      required={true}
+                      value={lawFirmPhoneCode + lawFirmPhone}
+                      onChange={(full, code, num) => {
+                        setLawFirmPhoneCode(code);
+                        setLawFirmPhone(num);
+                      }}
+                    />
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">كلمة المرور *</label>
-                      <input
-                        type="password"
-                        value={signupPassword}
-                        onChange={(e) => setSignupPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none"
-                        required
-                      />
-                    </div>
+                    {!(activePortal === "lawyers_admin" && wizardStep === 2) && (
+                      <div>
+                        <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">كلمة المرور *</label>
+                        <input
+                          type="password"
+                          value={signupPassword}
+                          onChange={(e) => setSignupPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none font-bold font-mono"
+                          required
+                        />
+                      </div>
+                    )}
 
                     <div>
                       <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">رمز ترخيص النسخة (اختياري)</label>
@@ -680,9 +835,42 @@ export default function LoginView({
                     </div>
                   </div>
 
-                  <button
-                    type="submit"
-                    className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl transition shadow-sm cursor-pointer"
+                  {(activePortal === "lawyers_admin" && wizardStep === 2) && (
+                      <div className="col-span-1 sm:col-span-2 space-y-3 bg-amber-50 dark:bg-amber-950/20 p-4 rounded-xl border border-amber-200 dark:border-amber-800/50">
+                        <div className="flex items-center gap-2 mb-2 text-amber-700 dark:text-amber-500 font-bold">
+                          <span className="w-5 h-5 flex items-center justify-center rounded-full bg-amber-200 dark:bg-amber-800 text-[10px]">2</span>
+                          <span>الوثائق الرسمية (مطلوبة للتوثيق)</span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 leading-relaxed mb-3">
+                          يتم تشفير هذه الوثائق باستخدام معيار Base64 ولا يمكن الوصول إليها إلا بواسطة المالك لضمان سرية النظام.
+                        </p>
+                        <div>
+                          <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-[10px]">صورة بطاقة الرقم القومي (وجه)</label>
+                          <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, setNationalIdFront)} className="w-full text-xs" required />
+                        </div>
+                        <div>
+                          <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-[10px]">صورة بطاقة الرقم القومي (ظهر)</label>
+                          <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, setNationalIdBack)} className="w-full text-xs" required />
+                        </div>
+                        <div>
+                          <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-[10px]">صورة كارنيه المحاماة</label>
+                          <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, setLawyerCard)} className="w-full text-xs" required />
+                        </div>
+                        <div className="flex gap-2 pt-2">
+                          <button type="button" onClick={() => setWizardStep(1)} className="flex-1 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-black text-xs rounded-xl transition cursor-pointer">
+                            رجوع
+                          </button>
+                          <button type="submit" className="flex-1 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl transition cursor-pointer">
+                            إرسال وتوثيق الحساب
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <button
+                      type="submit"
+                      style={{ display: (activePortal === "lawyers_admin" && wizardStep === 2) ? 'none' : 'block' }}
+                      className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl transition shadow-sm cursor-pointer"
                   >
                     طلب رمز التحقق والتفعيل عبر الهاتف (SMS OTP)
                   </button>
@@ -768,14 +956,13 @@ export default function LoginView({
                 </p>
                 <div>
                   <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">رقم الهاتف *</label>
-                  <input
-                    type="tel"
-                    value={resetPhone}
-                    onChange={(e) => setResetPhone(e.target.value)}
-                    placeholder="01xxxxxxxxx"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 rounded-xl border border-slate-200 dark:border-slate-800 outline-none font-bold"
-                    required
-                  />
+                  <PhoneInputWithCountry
+                      value={resetPhoneCode + resetPhone}
+                      onChange={(full, code, num) => {
+                        setResetPhoneCode(code);
+                        setResetPhone(num);
+                      }}
+                    />
                 </div>
                 <button
                   type="submit"
@@ -888,7 +1075,7 @@ export default function LoginView({
           🔒 تأمين وحماية بيانات المحاماة والتوثيق الإلكتروني المعتمد لعام ٢٠٢٦
         </p>
         <p className="text-[10px] text-slate-400">
-          © {new Date().getFullYear()} الأستاذ وسام حمدي الشناوي المحامى
+          © {new Date().getFullYear()} الأستاذ المحامي المحامى
         </p>
       </div>
 

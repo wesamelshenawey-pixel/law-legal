@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Shield, Users, ArrowRight, Building2 } from 'lucide-react';
-import { GoldenEagleEmblem } from './GoldenEagleEmblem';
+import GoldenEagleEmblem from './GoldenEagleEmblem';
 
 interface LoginGatewayProps {
   onSelectAdminGate: () => void;

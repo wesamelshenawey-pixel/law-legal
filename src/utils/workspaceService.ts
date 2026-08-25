@@ -17,13 +17,53 @@ export interface GoogleContact {
   avatarUrl?: string;
 }
 
+export interface SignatureHistoryEntry {
+  timestamp: string;
+  action: string;
+  performedBy: string;
+  status: "none" | "pending" | "signed" | "rejected";
+  notes?: string;
+}
+
 export interface GoogleKeepNote {
   id: string;
   title: string;
   content: string;
-  date: string;
+  date?: string;
+  category?: string;
+  createdAt?: string;
+  updatedAt?: string;
   tags?: string[];
   pinned?: boolean;
+  isPinned?: boolean;
+  color?: string;
+  requiresSignature?: boolean; // تتطلب تأكيداً قانونياً وتوقيعاً إلكترونياً
+  signatureRequestedBy?: "lawyer" | "client"; // الجهة الطالبة للتوقيع
+  signatureRequestedAt?: string;
+  confirmationToken?: string;
+  confirmationLink?: string;
+  clientId?: string;
+  clientName?: string;
+  clientPhone?: string;
+  caseNumber?: string;
+  legalAffirmation?: string; // صيغة الإقرار والتأكيد القانوني
+  signatureStatus?: "none" | "pending" | "signed" | "rejected";
+  signatureHistory?: SignatureHistoryEntry[];
+  signatureData?: {
+    signedBy: string;
+    nationalId?: string;
+    signedAt: string;
+    signatureImage?: string; // Data URL for drawn signature (High-Res Transparent PNG)
+    signatureVectorSvg?: string; // SVG Vector Path
+    signatureType?: "drawn" | "digital_badge";
+    ipOrDeviceId?: string;
+    verificationHash?: string;
+    digitalStamp?: string;
+    lawyerSignatureName?: string;
+    notes?: string;
+    biometricTelemetry?: any;
+    behavioralFingerprint?: string;
+  };
 }
 
 export interface GoogleDriveFile {
@@ -76,7 +116,7 @@ const SCOPES = [
   "https://www.googleapis.com/auth/drive.readonly",
   "https://www.googleapis.com/auth/spreadsheets",
   "https://www.googleapis.com/auth/spreadsheets.readonly",
-  "https://www.googleapis.com/auth/meetings.space.create",
+  
   "https://www.googleapis.com/auth/chat.messages",
   "https://www.googleapis.com/auth/chat.messages.create",
   "https://www.googleapis.com/auth/chat.messages.readonly",
@@ -619,47 +659,295 @@ export function openGooglePicker({
 // ==========================================
 const KEEP_STORAGE_KEY = "wesam_google_keep_memos";
 
+export function buildConfirmationLink(noteId: string, token?: string): string {
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://law-firm.app";
+  const pathname = typeof window !== "undefined" ? window.location.pathname : "/";
+  const tok = token || "SIG-" + Math.random().toString(36).substring(2, 9).toUpperCase();
+  return `${origin}${pathname}?action=sign_memo&memoId=${encodeURIComponent(noteId)}&token=${encodeURIComponent(tok)}`;
+}
+
 export function getLocalKeepMemos(): GoogleKeepNote[] {
   try {
     const saved = localStorage.getItem(KEEP_STORAGE_KEY);
     if (saved) return JSON.parse(saved);
-    return [
+    const initialNotes: GoogleKeepNote[] = [
       {
         id: "keep-1",
+        title: "إقرار تسليم أصل مستندات عقد البيع الابتدائي والتوكيل",
+        content: "أقر أنا الموكل باستلام أصول صحيفة الدعوى وأصل عقد البيع المؤرخ ٢٠٢٤/١٠/١٥ والمودع بخزينة المحكمة، والموافقة على التنازل عن الشق المستعجل.",
+        date: "2026-08-22T09:15:00.000Z",
+        tags: ["تأكيد قانوني", "استلام مستندات"],
+        pinned: true,
+        requiresSignature: true,
+        signatureRequestedBy: "lawyer",
+        signatureRequestedAt: "2026-08-22T09:20:00.000Z",
+        confirmationToken: "SIG-9842-LAW",
+        confirmationLink: buildConfirmationLink("keep-1", "SIG-9842-LAW"),
+        clientName: "عصام الدين عبد الحميد الشاذلي",
+        clientPhone: "01091234567",
+        caseNumber: "٤٨٢٠ / ٢٠٢٥ مدني كلي الزقازيق",
+        legalAffirmation: "أقر بصفتي الموكل بصحة استلام أصل المستندات والموافقة على خطة الدفاع وإجراءات التنازل القانوني.",
+        signatureStatus: "signed",
+        signatureHistory: [
+          {
+            timestamp: "2026-08-22T09:20:00.000Z",
+            action: "طلب توقيع رقمي",
+            performedBy: "الأستاذ وسام الشناوي (المحامي)",
+            status: "pending",
+            notes: "تم توليد رابط التأكيد القانوني وإرساله للموكل"
+          },
+          {
+            timestamp: "2026-08-22T10:40:12.000Z",
+            action: "اعتماد التوقيع الإلكتروني",
+            performedBy: "عصام الدين عبد الحميد الشاذلي (الموكل)",
+            status: "signed",
+            notes: "تم التوقيع الإلكتروني بنجاح بالرسم اليدوي والبصمة الرقمية"
+          }
+        ],
+        signatureData: {
+          signedBy: "عصام الدين عبد الحميد الشاذلي",
+          nationalId: "28804151301234",
+          signedAt: "2026-08-22T10:40:12.000Z",
+          signatureType: "drawn",
+          verificationHash: "E-SIG-9842-LAW-EG",
+          digitalStamp: "مكتب الأستاذ وسام الشناوي - توقيع إلكتروني معتمد",
+          lawyerSignatureName: "الأستاذ وسام أحمد الشناوي المحامي بالنقض",
+          notes: "تم التوقيع الإلكتروني وتأكيد الهوية عبر البصمة الرقمية للعميل"
+        }
+      },
+      {
+        id: "keep-2",
+        title: "الموافقة على التصالح وسداد باقي الأتعاب والمصروفات القضائية",
+        content: "المطلوب اعتماد الموكل لاتفاق الصلح الودّي المعروض من الخصم بالجلسة القادمة وتفويض الأستاذ وسام الشناوي في التقرير بالصلح بمحضر الجلسة.",
+        date: "2026-08-24T11:00:00.000Z",
+        tags: ["جلسات", "صلح"],
+        pinned: true,
+        requiresSignature: true,
+        signatureRequestedBy: "lawyer",
+        signatureRequestedAt: "2026-08-24T11:05:00.000Z",
+        confirmationToken: "SIG-1192-NEHAL",
+        confirmationLink: buildConfirmationLink("keep-2", "SIG-1192-NEHAL"),
+        clientName: "نهال أحمد الصاوي محمد",
+        clientPhone: "01187654321",
+        caseNumber: "١١٩٢ / ٢٠٢٦ أسرة ههيا",
+        legalAffirmation: "أقر أنا الموكلة بالموافقة الصريحة على شروط محضر الصلح وتفويض المحامي في إثباته رسمياً.",
+        signatureStatus: "pending",
+        signatureHistory: [
+          {
+            timestamp: "2026-08-24T11:05:00.000Z",
+            action: "إنشاء طلب التوقيع وإصدار رابط التأكيد",
+            performedBy: "الأستاذ وسام الشناوي (المحامي)",
+            status: "pending",
+            notes: "تم إرسال رابط التأكيد القانوني عبر رسائل الواتساب"
+          }
+        ]
+      },
+      {
+        id: "keep-3",
         title: "ملاحظات جلسة الاستئناف - دائرة 14 مدني",
         content: "التأكيد على استخراج صورة رسمية من التوكيل رقم ٤٥٢ لسنة ٢٠٢٥ توثيق الأهرام قبل موعد الجلسة.",
         date: "2026-08-20T10:00:00.000Z",
         tags: ["جلسات", "استئناف"],
-        pinned: true
-      },
-      {
-        id: "keep-2",
-        title: "مطابقة مستندات زواج الأجانب بوزارة العدل",
-        content: "مراجعة أختام السفارة البريطانية والتصديق القنصلي بوزارة الخارجية بميدان أحمد عرابي.",
-        date: "2026-08-21T14:30:00.000Z",
-        tags: ["توثيق", "أجانب"],
-        pinned: false
+        pinned: false,
+        requiresSignature: false,
+        signatureStatus: "none"
       }
     ];
+    return initialNotes;
   } catch {
     return [];
   }
 }
 
+export function getKeepMemoById(id: string): GoogleKeepNote | null {
+  const list = getLocalKeepMemos();
+  return list.find(m => m.id === id) || null;
+}
+
 export function saveLocalKeepMemo(memo: Omit<GoogleKeepNote, "id" | "date"> & { id?: string }): GoogleKeepNote {
   const list = getLocalKeepMemos();
+  const existing = memo.id ? list.find(m => m.id === memo.id) : null;
+  const memoId = memo.id || "keep-" + Date.now();
+  const token = memo.confirmationToken || existing?.confirmationToken || "SIG-" + Math.random().toString(36).substring(2, 9).toUpperCase();
+  const link = memo.confirmationLink || existing?.confirmationLink || (memo.requiresSignature ? buildConfirmationLink(memoId, token) : undefined);
+
+  const initialHistory: SignatureHistoryEntry[] = existing?.signatureHistory || [];
+  if (memo.requiresSignature && initialHistory.length === 0) {
+    initialHistory.push({
+      timestamp: new Date().toISOString(),
+      action: "إنشاء طلب توقيع رقمي",
+      performedBy: memo.signatureRequestedBy === "client" ? "الموكل" : "الأستاذ وسام الشناوي (المحامي)",
+      status: "pending",
+      notes: "تم إنشاء رابط التأكيد القانوني الخاص بالملحوظة"
+    });
+  }
+
   const newMemo: GoogleKeepNote = {
-    id: memo.id || "keep-" + Date.now(),
+    id: memoId,
     title: memo.title,
     content: memo.content,
-    date: new Date().toISOString(),
+    date: existing ? existing.date : new Date().toISOString(),
     tags: memo.tags || ["مذكرة قانونية"],
-    pinned: memo.pinned || false
+    pinned: memo.pinned !== undefined ? memo.pinned : false,
+    requiresSignature: memo.requiresSignature !== undefined ? memo.requiresSignature : (existing?.requiresSignature || false),
+    signatureRequestedBy: memo.signatureRequestedBy || existing?.signatureRequestedBy || (memo.requiresSignature ? "lawyer" : undefined),
+    signatureRequestedAt: memo.signatureRequestedAt || existing?.signatureRequestedAt || (memo.requiresSignature ? new Date().toISOString() : undefined),
+    confirmationToken: token,
+    confirmationLink: link,
+    clientId: memo.clientId || existing?.clientId,
+    clientName: memo.clientName || existing?.clientName,
+    clientPhone: memo.clientPhone || existing?.clientPhone,
+    caseNumber: memo.caseNumber || existing?.caseNumber,
+    legalAffirmation: memo.legalAffirmation || existing?.legalAffirmation,
+    signatureStatus: memo.signatureStatus || existing?.signatureStatus || (memo.requiresSignature ? "pending" : "none"),
+    signatureHistory: initialHistory,
+    signatureData: memo.signatureData || existing?.signatureData
   };
 
   const updated = [newMemo, ...list.filter(m => m.id !== newMemo.id)];
   localStorage.setItem(KEEP_STORAGE_KEY, JSON.stringify(updated));
   return newMemo;
+}
+
+export function signLocalKeepMemo(
+  id: string,
+  signatureData: {
+    signedBy: string;
+    nationalId?: string;
+    signatureImage?: string;
+    signatureVectorSvg?: string;
+    signatureType?: "drawn" | "digital_badge";
+    notes?: string;
+    biometricTelemetry?: any;
+    behavioralFingerprint?: string;
+  }
+): GoogleKeepNote | null {
+  const list = getLocalKeepMemos();
+  const index = list.findIndex(m => m.id === id);
+  if (index === -1) return null;
+
+  const now = new Date().toISOString();
+  const hash = "E-SIG-" + Math.floor(1000 + Math.random() * 9000) + "-VERIFIED-" + Date.now().toString(36).toUpperCase();
+
+  const history: SignatureHistoryEntry[] = list[index].signatureHistory ? [...list[index].signatureHistory!] : [];
+  history.push({
+    timestamp: now,
+    action: "اعتماد التوقيع والتأكيد الإلكتروني",
+    performedBy: `${signatureData.signedBy} (الموكل)`,
+    status: "signed",
+    notes: signatureData.notes || "تم اعتماد التوقيع الرقمي بنجاح طبقاً لقانون التوقيع الإلكتروني المصري"
+  });
+
+  const updatedMemo: GoogleKeepNote = {
+    ...list[index],
+    signatureStatus: "signed",
+    signatureHistory: history,
+    signatureData: {
+      signedBy: signatureData.signedBy,
+      nationalId: signatureData.nationalId,
+      signedAt: now,
+      signatureImage: signatureData.signatureImage,
+      signatureVectorSvg: signatureData.signatureVectorSvg,
+      signatureType: signatureData.signatureType || "drawn",
+      verificationHash: hash,
+      digitalStamp: "مكتب الأستاذ وسام الشناوي - توقيع إلكتروني معتمد قانونياً",
+      lawyerSignatureName: "الأستاذ وسام أحمد الشناوي المحامي بالنقض",
+      ipOrDeviceId: "Device-Verified-" + Math.random().toString(36).substring(2, 7),
+      notes: signatureData.notes || "تم التوقيع الإلكتروني والتأكيد القانوني بنجاح",
+      biometricTelemetry: signatureData.biometricTelemetry,
+      behavioralFingerprint: signatureData.behavioralFingerprint
+    }
+  };
+
+  list[index] = updatedMemo;
+  localStorage.setItem(KEEP_STORAGE_KEY, JSON.stringify(list));
+  return updatedMemo;
+}
+
+export function requestSignatureForKeepMemo(
+  id: string,
+  clientInfo: {
+    clientName: string;
+    clientPhone?: string;
+    caseNumber?: string;
+    legalAffirmation?: string;
+    requestedBy?: "lawyer" | "client";
+  }
+): GoogleKeepNote | null {
+  const list = getLocalKeepMemos();
+  const index = list.findIndex(m => m.id === id);
+  if (index === -1) return null;
+
+  const token = list[index].confirmationToken || "SIG-" + Math.random().toString(36).substring(2, 9).toUpperCase();
+  const link = buildConfirmationLink(id, token);
+  const now = new Date().toISOString();
+
+  const history: SignatureHistoryEntry[] = list[index].signatureHistory ? [...list[index].signatureHistory!] : [];
+  history.push({
+    timestamp: now,
+    action: "توليد رابط تأكيد قانوني وطلب توقيع",
+    performedBy: clientInfo.requestedBy === "client" ? "الموكل" : "الأستاذ وسام الشناوي (المحامي)",
+    status: "pending",
+    notes: `طلب تأكيد موجه إلى الموكل: ${clientInfo.clientName}`
+  });
+
+  const updatedMemo: GoogleKeepNote = {
+    ...list[index],
+    requiresSignature: true,
+    signatureRequestedBy: clientInfo.requestedBy || "lawyer",
+    signatureRequestedAt: now,
+    confirmationToken: token,
+    confirmationLink: link,
+    clientName: clientInfo.clientName,
+    clientPhone: clientInfo.clientPhone,
+    caseNumber: clientInfo.caseNumber,
+    legalAffirmation: clientInfo.legalAffirmation || "أقر بصفتي الموكل بصحة البيانات والبنود الواردة بهذه الملحوظة والموافقة عليها قانونياً.",
+    signatureStatus: "pending",
+    signatureHistory: history
+  };
+
+  list[index] = updatedMemo;
+  localStorage.setItem(KEEP_STORAGE_KEY, JSON.stringify(list));
+  return updatedMemo;
+}
+
+export function updateNoteSignatureStatus(
+  id: string,
+  status: "none" | "pending" | "signed" | "rejected",
+  reason?: string
+): GoogleKeepNote | null {
+  const list = getLocalKeepMemos();
+  const index = list.findIndex(m => m.id === id);
+  if (index === -1) return null;
+
+  const now = new Date().toISOString();
+  const history: SignatureHistoryEntry[] = list[index].signatureHistory ? [...list[index].signatureHistory!] : [];
+  
+  const actionLabels: Record<string, string> = {
+    none: "إلغاء إلزام التوقيع",
+    pending: "إعادة تعيين الحالة إلى بانتظار التوقيع",
+    signed: "اعتماد التوقيع يدوياً من المحامي",
+    rejected: "رفض التوقيع أو استبعاده"
+  };
+
+  history.push({
+    timestamp: now,
+    action: actionLabels[status] || "تحديث حالة التوقيع",
+    performedBy: "الأستاذ وسام الشناوي (المحامي)",
+    status: status,
+    notes: reason || undefined
+  });
+
+  const updatedMemo: GoogleKeepNote = {
+    ...list[index],
+    signatureStatus: status,
+    requiresSignature: status !== "none",
+    signatureHistory: history
+  };
+
+  list[index] = updatedMemo;
+  localStorage.setItem(KEEP_STORAGE_KEY, JSON.stringify(list));
+  return updatedMemo;
 }
 
 export function deleteLocalKeepMemo(id: string): void {

@@ -42,7 +42,7 @@ export default function FeesView({ fees, clients, onAddFeeTransfer, currentUser 
     setShowAddForm(false);
     setPayAmount("");
     setPayNotes("");
-    alert("تم قيد وتقييد الفاتورة المالية سحابياً في جدول إيرادات مكتب وسام الشناوي المحامي!");
+    alert("تم قيد وتقييد الفاتورة المالية سحابياً في جدول إيرادات مكتب المحامي المحامي!");
   };
 
   // Calculations for billing dashboard
@@ -255,7 +255,7 @@ export default function FeesView({ fees, clients, onAddFeeTransfer, currentUser 
                   <p>رقم المستند المالي: INV-{selectedClientForInvoice.id.slice(-4).toUpperCase()}</p>
                 </div>
                 <div className="text-right">
-                  <h4 className="text-sm font-bold text-slate-905 text-slate-900">مكتب الأستاذ وسام الشناوي المحامي</h4>
+                  <h4 className="text-sm font-bold text-slate-905 text-slate-900">مكتب الأستاذ المحامي المحامي</h4>
                   <p className="text-[10px] text-slate-500 font-sans">هاتف: 01283233555 - ههيا / الزقازيق / الشرقية</p>
                 </div>
               </div>
@@ -309,7 +309,7 @@ export default function FeesView({ fees, clients, onAddFeeTransfer, currentUser 
                 </div>
                 <div className="text-right text-slate-400 font-normal text-[10px]">
                   <p>تعتبر هذه معالجة كربونية مالية إلكترونية من السحابة.</p>
-                  <p className="text-amber-800 font-bold mt-1 text-xs font-sans">مضاء ومصدق / مكتب الأستاذ وسام الشناوي</p>
+                  <p className="text-amber-800 font-bold mt-1 text-xs font-sans">مضاء ومصدق / مكتب الأستاذ المحامي</p>
                 </div>
               </div>
 

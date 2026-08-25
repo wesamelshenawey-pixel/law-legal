@@ -87,7 +87,7 @@ export default function LicensingGate({
 
     if (numDevices >= matchedLicense.maxDevices) {
       setErrorMsg(language === "ar" 
-        ? `تجاوزت هذه النسخة الحد الأقصى للأجهزة المصرح بها (الحد الأقصى الحالي: ${matchedLicense.maxDevices} جهاز). يرجى مراجعة الأستاذ وسام الشناوي لترقية النسخة.` 
+        ? `تجاوزت هذه النسخة الحد الأقصى للأجهزة المصرح بها (الحد الأقصى الحالي: ${matchedLicense.maxDevices} جهاز). يرجى مراجعة الأستاذ المحامي لترقية النسخة.` 
         : `This license has reached its maximum device limit (${matchedLicense.maxDevices} device(s)). Contact Wesam to upgrade.`);
       return;
     }

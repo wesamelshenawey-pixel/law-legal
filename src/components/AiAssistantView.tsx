@@ -33,7 +33,7 @@ export default function AiAssistantView({ currentUser, onUpdateUserSubscription 
 
   const [chatMessage, setChatMessage] = useState("");
   const [chatHistory, setChatHistory] = useState<{ role: "user" | "model"; text: string }[]>([
-    { role: "model", text: "أهلاً بك! أنا مساعدك القانوني الذكي المدرب تحت رعاية الأستاذ وسام الشناوي. كيف يمكنني إفادتك اليوم؟" }
+    { role: "model", text: "أهلاً بك! أنا مساعدك القانوني الذكي المدرب تحت رعاية الأستاذ المحامي. كيف يمكنني إفادتك اليوم؟" }
   ]);
 
   const [ocrImageStr, setOcrImageStr] = useState<string | null>(null);
@@ -125,7 +125,7 @@ export default function AiAssistantView({ currentUser, onUpdateUserSubscription 
       setIsSubscribed(true);
       setIsProcessingPayment(false);
       setShowPayModal(false);
-      alert("تم تأكيد دفع قيمة الاشتراك بنجاح (100 جنيه / 50 دولار) عبر المحفظة / InstaPay! تم فتح مميزات الذكاء الاصطناعي لكافة أدوات مكتب وسام الشناوي.");
+      alert("تم تأكيد دفع قيمة الاشتراك بنجاح (100 جنيه / 50 دولار) عبر المحفظة / InstaPay! تم فتح مميزات الذكاء الاصطناعي لكافة أدوات مكتب المحامي.");
     }, 1500);
   };
 
@@ -1039,7 +1039,7 @@ export default function AiAssistantView({ currentUser, onUpdateUserSubscription 
                     type="text"
                     value={chatMessage}
                     onChange={(e) => setChatMessage(e.target.value)}
-                    placeholder="اكتب استشارتك للمحامي وسام الشناوي هنا..."
+                    placeholder="اكتب استشارتك للمحامي المحامي هنا..."
                     className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 text-slate-900 rounded-lg outline-none text-right focus:bg-white focus:border-amber-500 transition"
                   />
                   <button
