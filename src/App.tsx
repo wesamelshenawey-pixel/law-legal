@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { jsPDF } from "jspdf";
-import { Analytics } from '@vercel/analytics/react';
 import { 
   UserRole, 
   PlatformUser, 
@@ -2407,7 +2406,6 @@ export default function App() {
         </div>
       )}
     </div>
-    <Analytics />
     </>
   );
 }
