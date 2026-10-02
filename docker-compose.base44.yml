@@ -1,0 +1,20 @@
+services:
+  app:
+    image: node:22
+    working_dir: /app
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    ports: ["3000:3000"]
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-dummy_key}
+    command: ["sh","-ec","npm install --no-audit --no-fund && exec npm run dev"]
+    healthcheck:
+      test: ["CMD-SHELL","curl -fsS -m 5 http://localhost:3000/ >/dev/null || (echo app down; exit 1)"]
+      interval: 15s
+      timeout: 8s
+      retries: 4
+      start_period: 120s
+    restart: on-failure
+volumes:
+  node_modules:

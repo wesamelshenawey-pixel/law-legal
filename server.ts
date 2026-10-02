@@ -874,8 +874,9 @@ app.post("/api/notifications/send-email", async (req, res) => {
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, allowedHosts: true },
       appType: "spa",
+      // allow preview proxy hosts
     });
     app.use(vite.middlewares);
   } else {
