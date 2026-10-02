@@ -1,0 +1,24 @@
+services:
+  web:
+    image: node:22
+    working_dir: /app
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    ports: ["3000:3000"]
+    environment:
+      - __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS
+      - APP_URL=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}
+      - CHOKIDAR_USEPOLLING=true
+    env_file:
+      - /run/base44/app.env
+    command: ["sh", "-ec", "npm ci --no-audit --no-fund && exec npm run dev"]
+    restart: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3000/ >/dev/null || (echo web failed; exit 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+volumes:
+  node_modules:
