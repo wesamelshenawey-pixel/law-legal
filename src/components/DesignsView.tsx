@@ -135,63 +135,53 @@ export default function DesignsView({
       {/* ========================================================================= */}
       {/* 1. HEADER: DESIGNS & THEMES STUDIO TOOLBAR                                */}
       {/* ========================================================================= */}
-      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-wrap justify-between items-center gap-4">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 bg-amber-500/10 rounded-xl text-amber-500">
-            <Palette className="w-5 h-5" />
-          </div>
-          <h1 className="text-base md:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-            <span>{language === "ar" ? "قسم التصميمات والمظاهر للمكتب" : "Law Chambers Design Suite"}</span>
-            <span className="text-xs font-normal text-slate-400">({DESIGN_PRESETS.length} {language === "ar" ? "تصاميم" : "presets"})</span>
-          </h1>
-        </div>
-
+      <div className="bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-wrap justify-between items-center gap-3">
         {/* Tab Controls & Reset Button */}
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setActiveTab("presets")}
-            className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition cursor-pointer ${
               activeTab === "presets"
-                ? "bg-amber-500 text-slate-950 shadow-sm"
+                ? "bg-amber-500 text-slate-950 shadow-xs"
                 : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
             }`}
           >
-            <Palette className="w-4 h-4" />
+            <Palette className="w-3.5 h-3.5" />
             <span>{language === "ar" ? "معرض التصاميم الجاهزة" : "Pre-built Themes"}</span>
           </button>
 
           <button
             onClick={() => setActiveTab("customize")}
-            className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition cursor-pointer ${
               activeTab === "customize"
-                ? "bg-amber-500 text-slate-950 shadow-sm"
+                ? "bg-amber-500 text-slate-950 shadow-xs"
                 : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
             }`}
           >
-            <Sliders className="w-4 h-4" />
-            <span>{language === "ar" ? "تخصيص يدوي حر" : "Custom Tuning"}</span>
+            <Sliders className="w-3.5 h-3.5" />
+            <span>{language === "ar" ? "تخصيص يدوي" : "Custom Tuning"}</span>
           </button>
 
           <button
             onClick={() => setActiveTab("preview")}
-            className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition cursor-pointer ${
               activeTab === "preview"
-                ? "bg-amber-500 text-slate-950 shadow-sm"
+                ? "bg-amber-500 text-slate-950 shadow-xs"
                 : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
             }`}
           >
-            <Eye className="w-4 h-4" />
-            <span>{language === "ar" ? "المعاينة الحية" : "Live Preview"}</span>
-          </button>
-
-          <button
-            onClick={handleResetDefaults}
-            className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400 hover:text-amber-500 flex items-center gap-1 border border-slate-200 dark:border-slate-800 rounded-xl transition cursor-pointer"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>{language === "ar" ? "استعادة الافتراضي" : "Reset"}</span>
+            <Eye className="w-3.5 h-3.5" />
+            <span>{language === "ar" ? "معاينة حية" : "Preview"}</span>
           </button>
         </div>
+
+        <button
+          onClick={handleResetDefaults}
+          className="px-3 py-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-amber-500 flex items-center gap-1 border border-slate-200 dark:border-slate-800 rounded-xl transition cursor-pointer"
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          <span>{language === "ar" ? "استعادة الافتراضي" : "Reset"}</span>
+        </button>
       </div>
 
       {/* ========================================================================= */}

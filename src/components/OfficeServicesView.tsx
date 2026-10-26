@@ -87,68 +87,12 @@ export default function OfficeServicesView({
   };
 
   return (
-    <div className="space-y-8 text-right font-sans" dir="rtl">
+    <div className="space-y-6 text-right font-sans" dir="rtl">
       
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 text-white p-6 sm:p-8 rounded-3xl border border-amber-500/30 shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none -translate-x-1/2 -translate-y-1/2"></div>
-        
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="space-y-2 max-w-2xl">
-            <div className="flex items-center gap-2">
-              <span className="px-3 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full text-xs font-black flex items-center gap-1.5">
-                <span>⚖️</span>
-                <span>ديوان الأستاذ وسام أحمد الشناوي المحامي</span>
-              </span>
-              <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full text-xs font-bold">
-                ● جاهز لتقديم كافة الخدمات القانونية
-              </span>
-            </div>
-            
-            <h1 className="text-2xl sm:text-3xl font-black text-white leading-tight">
-              قائمة الخدمات القانونية والإدارية الشاملة
-            </h1>
-            
-            <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
-              منظومة متكاملة من الخدمات القانونية المتخصصة في كافة أفرع القانون والتقاضي وتأسيس الشركات والتوثيق والتحكيم والخدمات الرقمية بالذكاء الاصطناعي على مدار 24 ساعة.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-2.5 items-center">
-            <button
-              type="button"
-              onClick={handlePrintServices}
-              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-750 text-amber-300 border border-amber-500/30 text-xs font-bold rounded-xl flex items-center gap-2 transition cursor-pointer shadow-sm"
-            >
-              <Printer className="w-4 h-4 text-amber-400" />
-              <span>طباعة دليل الخدمات</span>
-            </button>
-
-            <a
-              href="https://wa.me/201283233555?text=%D8%A7%D9%84%D8%B3%D9%84%D8%A7%D9%85%20%D8%B9%D9%84%D9%8A%D9%83%D9%85%D8%8C%20%D8%A3%D8%B1%D8%BA%D8%A8%20%D9%81%D9%8A%20%D8%B7%D9%84%D8%A8%20%D8%AE%D8%AF%D9%85%D8%A9%20%D9%82%D8%A7%D9%86%D9%88%D9%86%D9%8A%D8%A9%20%D9%85%D9%86%20%D9%85%D9%83%D8%AA%D8%A8%20%D8%A7%D9%84%D8%A3%D8%B3%D8%AA%D8%A7%D8%B0%20%D9%88%D8%B3%D8%A7%D9%85%20%D8%A7%D9%84%D8%B4%D9%86%D8%A7%D9%88%D9%8A"
-              target="_blank"
-              rel="noreferrer"
-              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl flex items-center gap-2 transition shadow-md cursor-pointer"
-            >
-              <MessageSquare className="w-4 h-4" />
-              <span>واتساب الأستاذ وسام مباشرة</span>
-            </a>
-
-            <a
-              href="tel:01283233555"
-              className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:brightness-110 text-slate-950 text-xs font-black rounded-xl flex items-center gap-2 transition shadow-md cursor-pointer"
-            >
-              <Phone className="w-4 h-4" />
-              <span>اتصال هاتفي فوري</span>
-            </a>
-          </div>
-        </div>
-      </div>
-
-      {/* Filter and Search Bar */}
-      <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
+      {/* Standalone Action Buttons (Individual, Clean & Independent without bounding card) */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         {/* Category Tabs */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full">
+        <div className="flex flex-wrap items-center gap-2 max-w-full">
           {categories.map((cat) => (
             <button
               key={cat.id}
@@ -171,65 +115,76 @@ export default function OfficeServicesView({
           ))}
         </div>
 
-        {/* Search Input */}
-        <div className="relative min-w-[260px] md:min-w-[300px]">
-          <Search className="w-4 h-4 absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="ابحث في الخدمات (نقض، شركات، توثيق، ذكاء اصطناعي)..."
-            className="w-full bg-white dark:bg-slate-800 text-slate-900 dark:text-white pr-10 pl-4 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:border-amber-500 shadow-sm transition"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery("")}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
-            >
-              ×
-            </button>
-          )}
+        {/* Independent Standalone Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={handlePrintServices}
+            className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-amber-300 border border-amber-500/40 text-xs font-bold rounded-xl flex items-center gap-2 transition cursor-pointer shadow-sm active:scale-95"
+          >
+            <Printer className="w-4 h-4 text-amber-400" />
+            <span>طباعة دليل الخدمات</span>
+          </button>
+
+          <a
+            href="https://wa.me/201283233555?text=%D8%A7%D9%84%D8%B3%D9%84%D8%A7%D9%85%20%D8%B9%D9%84%D9%8A%D9%83%D9%85%D8%8C%20%D8%A3%D8%B1%D8%BA%D8%A8%20%D9%81%D9%8A%20%D8%B7%D9%84%D8%A8%20%D8%AE%D8%AF%D9%85%D8%A9%20%D9%82%D8%A7%D9%86%D9%88%D9%86%D9%8A%D8%A9%20%D9%85%D9%86%20%D9%85%D9%83%D8%AA%D8%A8%20%D8%A7%D9%84%D8%A3%D8%B3%D8%AA%D8%A7%D8%B0%20%D9%88%D8%B3%D8%A7%D9%85%20%D8%A7%D9%84%D8%B4%D9%86%D8%A7%D9%88%D9%8A"
+            target="_blank"
+            rel="noreferrer"
+            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl flex items-center gap-2 transition shadow-sm cursor-pointer active:scale-95"
+          >
+            <MessageSquare className="w-4 h-4" />
+            <span>واتساب الأستاذ وسام مباشرة</span>
+          </a>
+
+          <a
+            href="tel:01283233555"
+            className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:brightness-110 text-slate-950 text-xs font-black rounded-xl flex items-center gap-2 transition shadow-sm cursor-pointer active:scale-95"
+          >
+            <Phone className="w-4 h-4" />
+            <span>اتصال هاتفي فوري</span>
+          </a>
         </div>
       </div>
 
-      {/* Services Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Services Grid (4 Cards Per Row with Compact Size & Radiant Vivid Colors) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3.5">
         {filteredServices.map((service) => (
           <div
             key={service.id}
             onClick={() => setSelectedService(service)}
-            className="bg-white dark:bg-slate-850 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-amber-500/80 shadow-sm hover:shadow-lg transition-all duration-300 flex flex-col justify-between p-5 group cursor-pointer relative overflow-hidden"
+            className="bg-white dark:bg-slate-900 rounded-2xl border-2 border-slate-200 dark:border-slate-800 hover:border-amber-500 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between p-3.5 group cursor-pointer relative overflow-hidden"
           >
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {/* Card Header */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="p-3 bg-amber-50 dark:bg-amber-500/10 rounded-2xl border border-amber-200 dark:border-amber-500/20 text-2xl group-hover:scale-110 transition-transform">
+              <div className="flex items-start justify-between gap-2">
+                <div className="p-2.5 bg-amber-500/15 dark:bg-amber-500/20 rounded-xl border border-amber-500/30 text-xl group-hover:scale-110 transition-transform">
                   {service.icon}
                 </div>
-                <span className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-[10px] font-black border border-slate-200 dark:border-slate-700">
+                <span className="px-2 py-0.5 bg-amber-500/15 text-amber-800 dark:text-amber-300 rounded-lg text-[10px] font-black border border-amber-500/30">
                   {service.badge}
                 </span>
               </div>
 
-              {/* Title & Description */}
+              {/* Title & Description with Prominent Clear Colors */}
               <div>
-                <h3 className="text-sm font-black text-slate-900 dark:text-white group-hover:text-amber-600 transition-colors leading-snug">
+                <h3 className="text-sm font-black text-amber-600 dark:text-amber-400 group-hover:text-amber-500 dark:group-hover:text-amber-300 transition-colors leading-snug">
                   {service.title}
                 </h3>
-                <p className="text-[10px] text-slate-400 font-mono mt-0.5" dir="ltr">
+                <p className="text-[10px] text-sky-600 dark:text-sky-300 font-bold font-mono mt-0.5" dir="ltr">
                   {service.titleEn}
                 </p>
-                <p className="text-xs text-slate-600 dark:text-slate-300 mt-2 line-clamp-3 leading-relaxed">
-                  {service.description}
-                </p>
+                <div className="mt-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800">
+                  <p className="text-xs font-bold text-slate-800 dark:text-slate-100 line-clamp-3 leading-relaxed">
+                    {service.description}
+                  </p>
+                </div>
               </div>
 
               {/* Features snippet */}
-              <div className="space-y-1 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <div className="space-y-1 pt-1.5 border-t border-slate-200 dark:border-slate-800">
                 {service.features.slice(0, 2).map((feat, i) => (
-                  <div key={i} className="flex items-start gap-1.5 text-[11px] text-slate-650 dark:text-slate-300">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                  <div key={i} className="flex items-start gap-1.5 text-[11px] font-bold text-slate-700 dark:text-slate-200">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
                     <span className="line-clamp-1">{feat}</span>
                   </div>
                 ))}
@@ -237,20 +192,33 @@ export default function OfficeServicesView({
             </div>
 
             {/* Card Footer Actions */}
-            <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1 text-[10.5px] font-bold text-amber-700 dark:text-amber-400">
+            <div className="pt-3 mt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-1.5">
+              <div className="flex items-center gap-1 text-[11px] font-black text-amber-700 dark:text-amber-400">
                 <Clock className="w-3.5 h-3.5 text-amber-500" />
                 <span>{service.estimatedDays}</span>
               </div>
 
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1">
+                {service.id === "ocr_document_scanner" && onNavigate && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onNavigate("smart_ocr");
+                    }}
+                    className="px-2 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[11px] font-black rounded-lg transition shadow-sm cursor-pointer flex items-center gap-1"
+                    title="الانتقال المباشر لاستوديو Smart OCR"
+                  >
+                    <span>OCR 🚀</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     setRequestModalService(service);
                   }}
-                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black rounded-lg transition shadow-sm cursor-pointer"
+                  className="px-2.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black rounded-xl transition shadow-sm cursor-pointer active:scale-95"
                 >
                   طلب الخدمة ✍️
                 </button>
@@ -260,7 +228,7 @@ export default function OfficeServicesView({
                     e.stopPropagation();
                     setSelectedService(service);
                   }}
-                  className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 rounded-lg transition"
+                  className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition cursor-pointer"
                   title="عرض التفاصيل الكاملة"
                 >
                   <ChevronRight className="w-4 h-4" />
@@ -338,17 +306,32 @@ export default function OfficeServicesView({
 
             {/* Modal Footer */}
             <div className="p-4 bg-slate-50 dark:bg-slate-850 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  const s = selectedService;
-                  setSelectedService(null);
-                  setRequestModalService(s);
-                }}
-                className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl transition shadow-md flex items-center gap-2 cursor-pointer"
-              >
-                <span>طلب هذه الخدمة وتوكيل المكتب ✍️</span>
-              </button>
+              <div className="flex items-center gap-2">
+                {selectedService.id === "ocr_document_scanner" && onNavigate && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedService(null);
+                      onNavigate("smart_ocr");
+                    }}
+                    className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs rounded-xl transition shadow-md flex items-center gap-2 cursor-pointer"
+                  >
+                    <Sparkles className="w-4 h-4 text-amber-300" />
+                    <span>تشغيل استوديو Smart OCR Studio الآن 🚀</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const s = selectedService;
+                    setSelectedService(null);
+                    setRequestModalService(s);
+                  }}
+                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl transition shadow-md flex items-center gap-2 cursor-pointer"
+                >
+                  <span>طلب هذه الخدمة وتوكيل المكتب ✍️</span>
+                </button>
+              </div>
 
               <div className="flex items-center gap-2">
                 <a

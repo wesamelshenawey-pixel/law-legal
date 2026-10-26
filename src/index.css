@@ -46,10 +46,25 @@
   }
 }
 
-body {
-  background-color: #f1f5f9;
+html {
+  zoom: 0.9;
+  -moz-transform: scale(0.9);
+  -moz-transform-origin: 0 0;
+  min-height: 111.1%;
+  width: 100%;
+}
+
+html, body, #root {
+  min-height: 100%;
+  background-color: #0b1320;
   font-family: var(--font-sans);
-  color: #0f172a;
+  color: #f8fafc;
+  font-size: 15px;
+  line-height: 1.6;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Custom golden gradient visual helpers */

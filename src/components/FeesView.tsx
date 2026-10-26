@@ -1,17 +1,32 @@
 import React, { useState } from "react";
 import { FeeTransfer, ClientProfile, UserRole, PlatformUser } from "../types";
-import { Printer, Plus } from "lucide-react";
+import { Printer, Plus, CreditCard, Sparkles, CheckCircle2, Smartphone, DollarSign, FileText } from "lucide-react";
+import LegalPaymentGatewayModal from "./LegalPaymentGatewayModal";
+import ClientFeeDetailsModal from "./ClientFeeDetailsModal";
 
 interface FeesViewProps {
   fees: FeeTransfer[];
   clients: ClientProfile[];
   onAddFeeTransfer: (fee: FeeTransfer) => void;
   currentUser: PlatformUser;
+  language?: "ar" | "en";
+  onOpenFeeDetails?: (client: ClientProfile) => void;
 }
 
-export default function FeesView({ fees, clients, onAddFeeTransfer, currentUser }: FeesViewProps) {
+export default function FeesView({ 
+  fees, 
+  clients, 
+  onAddFeeTransfer, 
+  currentUser,
+  language = "ar",
+  onOpenFeeDetails
+}: FeesViewProps) {
   const [selectedClientName, setSelectedClientName] = useState("");
   const [selectedClientForInvoice, setSelectedClientForInvoice] = useState<ClientProfile | null>(null);
+  const [feeModalClient, setFeeModalClient] = useState<ClientProfile | null>(null);
+
+  // Legal Payment Gateway Modal State
+  const [isLegalPaymentGatewayOpen, setIsLegalPaymentGatewayOpen] = useState(false);
 
   // New payment form
   const [showAddForm, setShowAddForm] = useState(false);
@@ -20,6 +35,41 @@ export default function FeesView({ fees, clients, onAddFeeTransfer, currentUser 
   const [payCurrency, setPayCurrency] = useState<"EGP" | "USD">("EGP");
   const [payType, setPayType] = useState<"cash" | "bank" | "wallet">("cash");
   const [payNotes, setPayNotes] = useState("");
+
+  const handleGatewayPaymentConfirmed = (data: {
+    clientName: string;
+    amount: number;
+    currency: "EGP" | "USD";
+    paymentMethod: "instapay" | "vodafone_cash" | "fawry" | "card";
+    planOrCategory: string;
+    transactionId: string;
+    date: string;
+    notes: string;
+    consultationUpdated: boolean;
+  }) => {
+    const newTransfer: FeeTransfer = {
+      id: "fee-gate-" + Date.now(),
+      clientName: data.clientName,
+      amount: data.amount,
+      currency: data.currency,
+      type: data.paymentMethod === "instapay" ? "bank" : "wallet",
+      date: data.date,
+      notes: `[بوابة الدفع الإلكترونية: ${data.transactionId}] ${data.planOrCategory} - ${data.notes}`
+    };
+    onAddFeeTransfer(newTransfer);
+
+    // If this client exists in clients, deduct their remaining dues
+    const targetClient = clients.find(c => c.name.trim() === data.clientName.trim());
+    if (targetClient && targetClient.remainingFees > 0) {
+      targetClient.remainingFees = Math.max(0, targetClient.remainingFees - data.amount);
+      try {
+        localStorage.setItem("law_clients", JSON.stringify(clients));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  };
+
 
   const handleAddPaymentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,16 +110,30 @@ export default function FeesView({ fees, clients, onAddFeeTransfer, currentUser 
           <span className="text-xs font-black text-slate-700 dark:text-slate-300">
             سجل المقبوضات والأتعاب المالية ({fees.length} دفعة)
           </span>
-          <button
-            id="open-add-payment-btn"
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-900 text-xs font-bold rounded-xl flex items-center gap-1 cursor-pointer transition shadow-sm"
-          >
-            <Plus className="w-4 h-4 text-slate-900" />
-            تقييد دفعة مالية جديدة
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              id="open-legal-gateway-btn"
+              onClick={() => setIsLegalPaymentGatewayOpen(true)}
+              className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white text-xs font-black rounded-xl flex items-center gap-1.5 cursor-pointer transition shadow-md active:scale-95 border border-emerald-400"
+              title="بوابة الدفع القانونية الذكية لمحافظ InstaPay وفودافون كاش وتأكيد الاستشارات التلقائي"
+            >
+              <CreditCard className="w-4 h-4 text-emerald-200" />
+              <span>بوابة الدفع القانونية (InstaPay & المحافظ)</span>
+              <span className="bg-emerald-950/40 text-emerald-200 text-[10px] px-1.5 py-0.5 rounded-full font-mono">تأكيد تلقائي</span>
+            </button>
+
+            <button
+              id="open-add-payment-btn"
+              onClick={() => setShowAddForm(!showAddForm)}
+              className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-900 text-xs font-bold rounded-xl flex items-center gap-1 cursor-pointer transition shadow-sm"
+            >
+              <Plus className="w-4 h-4 text-slate-900" />
+              تقييد دفعة يدوية
+            </button>
+          </div>
         </div>
       )}
+
 
       {/* REVENUE STATISTICS BLOCK */}
       {currentUser.role !== UserRole.CLIENT && (
@@ -234,15 +298,31 @@ export default function FeesView({ fees, clients, onAddFeeTransfer, currentUser 
         <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm text-right relative text-slate-800">
           
           <div className="flex justify-between items-center pb-2 border-b border-slate-100 flex-wrap gap-2">
-            <button
-              id="print-invoice"
-              onClick={() => window.print()}
-              disabled={!selectedClientForInvoice}
-              className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 disabled:opacity-50 text-slate-750 text-[11px] font-bold rounded flex items-center gap-1 cursor-pointer transition shadow-sm"
-            >
-              <Printer className="w-3.5 h-3.5 text-slate-500" />
-              طباعة فاتورة الموكل
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (selectedClientForInvoice) {
+                    if (onOpenFeeDetails) onOpenFeeDetails(selectedClientForInvoice);
+                    else setFeeModalClient(selectedClientForInvoice);
+                  }
+                }}
+                disabled={!selectedClientForInvoice}
+                className="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 disabled:opacity-50 text-slate-950 text-xs font-black rounded-xl flex items-center gap-1.5 cursor-pointer transition shadow-md"
+              >
+                <DollarSign className="w-3.5 h-3.5 text-slate-950" />
+                <span>فتح الفاتورة الذكية المعتمدة A4</span>
+              </button>
+              <button
+                id="print-invoice"
+                onClick={() => window.print()}
+                disabled={!selectedClientForInvoice}
+                className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 disabled:opacity-50 text-slate-750 text-[11px] font-bold rounded flex items-center gap-1 cursor-pointer transition shadow-sm"
+              >
+                <Printer className="w-3.5 h-3.5 text-slate-500" />
+                طباعة سريعة
+              </button>
+            </div>
             <h3 className="text-sm font-bold text-slate-900">مستند مخالصة وفاتورة تصفية أتعاب</h3>
           </div>
 
@@ -323,6 +403,27 @@ export default function FeesView({ fees, clients, onAddFeeTransfer, currentUser 
         </div>
       </div>
 
+      {/* Legal Payment Gateway Modal (InstaPay & E-Wallets) */}
+      <LegalPaymentGatewayModal
+        isOpen={isLegalPaymentGatewayOpen}
+        onClose={() => setIsLegalPaymentGatewayOpen(false)}
+        clients={clients}
+        onPaymentConfirmed={handleGatewayPaymentConfirmed}
+        currentUser={currentUser}
+        language={language}
+      />
+
+      {/* Client Detailed Fee Information & Printable Invoice Modal */}
+      <ClientFeeDetailsModal
+        isOpen={!!feeModalClient}
+        onClose={() => setFeeModalClient(null)}
+        client={feeModalClient}
+        fees={fees}
+        language={language}
+        currentUser={currentUser}
+      />
+
     </div>
   );
 }
+

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { CaseRecord, CaseMilestone, PlatformUser, UserRole } from "../types";
 import { 
   CheckCircle2, 
@@ -21,7 +21,11 @@ import {
   Building2,
   FileCheck2,
   Send,
-  Flag
+  Flag,
+  MessageSquare,
+  Play,
+  Square,
+  Timer
 } from "lucide-react";
 
 interface CaseTimelineProps {
@@ -116,6 +120,18 @@ export default function CaseTimeline({
   const [editNotes, setEditNotes] = useState("");
   const [editCircuit, setEditCircuit] = useState("");
 
+  // Live timer tick
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const hasRunningTimers = milestones.some(m => m.timeTracker?.isRunning);
+    if (!hasRunningTimers) return;
+    
+    const interval = setInterval(() => {
+      setTick(t => t + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [milestones]);
+
   // Calculate completed progress
   const completedCount = milestones.filter(m => m.status === "completed").length;
   const progressPercent = Math.round((completedCount / Math.max(milestones.length, 1)) * 100);
@@ -203,12 +219,66 @@ export default function CaseTimeline({
     window.print();
   };
 
+  const handleToggleTimeTracker = (milestoneId: string) => {
+    if (!onUpdateCase) return;
+    const m = milestones.find(x => x.id === milestoneId);
+    if (!m) return;
+    
+    let updatedTimeTracker = m.timeTracker ? { ...m.timeTracker } : { durationMs: 0, isRunning: false };
+    
+    if (updatedTimeTracker.isRunning) {
+      // Stop timer
+      const startTime = updatedTimeTracker.startTime ? new Date(updatedTimeTracker.startTime).getTime() : Date.now();
+      const elapsedMs = Date.now() - startTime;
+      updatedTimeTracker.durationMs = (updatedTimeTracker.durationMs || 0) + elapsedMs;
+      updatedTimeTracker.endTime = new Date().toISOString();
+      updatedTimeTracker.isRunning = false;
+    } else {
+      // Start timer
+      updatedTimeTracker.startTime = new Date().toISOString();
+      updatedTimeTracker.endTime = undefined;
+      updatedTimeTracker.isRunning = true;
+    }
+
+    const updated = milestones.map(item => 
+      item.id === milestoneId ? { ...item, timeTracker: updatedTimeTracker } : item
+    );
+    onUpdateCase(caseRecord.id, { timeline: updated });
+  };
+
+  const getLiveDuration = (timeTracker: CaseMilestone["timeTracker"]) => {
+    if (!timeTracker) return 0;
+    let totalMs = timeTracker.durationMs || 0;
+    if (timeTracker.isRunning && timeTracker.startTime) {
+      totalMs += Date.now() - new Date(timeTracker.startTime).getTime();
+    }
+    return totalMs;
+  };
+
+  const formatDuration = (ms: number | undefined) => {
+    if (!ms) return "00:00:00";
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+  };
+
   const getMilestoneIcon = (type: CaseMilestone["type"], status: CaseMilestone["status"]) => {
     if (status === "completed") {
       return <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />;
     }
     if (status === "in_progress") {
       return <Scale className="w-5 h-5 text-amber-600 dark:text-amber-400 animate-pulse" />;
+    }
+    if (type === "alert") {
+      return <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />;
+    }
+    if (type === "message") {
+      return <MessageSquare className="w-5 h-5 text-blue-500 dark:text-blue-400" />;
+    }
+    if (type === "session" || type === "first_session") {
+      return <Gavel className="w-5 h-5 text-amber-700 dark:text-amber-500" />;
     }
     if (type === "judgment") {
       return <Gavel className="w-5 h-5 text-blue-600 dark:text-blue-400" />;
@@ -335,9 +405,25 @@ export default function CaseTimeline({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                {language === "ar" ? "نوع الحدث" : "Event Type"}
+              </label>
+              <select
+                value={customType}
+                onChange={(e) => setCustomType(e.target.value as CaseMilestone["type"])}
+                className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:border-amber-500 text-right"
+              >
+                <option value="custom">{language === "ar" ? "محطة مخصصة" : "Custom"}</option>
+                <option value="session">{language === "ar" ? "جلسة محكمة" : "Court Session"}</option>
+                <option value="alert">{language === "ar" ? "تنبيه هام" : "Important Alert"}</option>
+                <option value="message">{language === "ar" ? "رسالة متبادلة مع الموكل" : "Client Message"}</option>
+              </select>
+            </div>
+            
             <div className="md:col-span-2">
               <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                {language === "ar" ? "عنوان المرحلة القضائية *" : "Milestone Title *"}
+                {language === "ar" ? "عنوان الحدث *" : "Event Title *"}
               </label>
               <input
                 type="text"
@@ -348,7 +434,9 @@ export default function CaseTimeline({
                 required
               />
             </div>
+          </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
             <div>
               <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
                 {language === "ar" ? "تاريخ الاستحقاق أو الجلسة" : "Target Date"}
@@ -360,9 +448,7 @@ export default function CaseTimeline({
                 className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:border-amber-500 font-mono text-center"
               />
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
             <div>
               <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
                 {language === "ar" ? "الحالة التنفيذية" : "Status"}
@@ -635,6 +721,45 @@ export default function CaseTimeline({
                       {m.decisionOrNotes && (
                         <div className="mt-2 p-2.5 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
                           <p className="whitespace-pre-wrap">{m.decisionOrNotes}</p>
+                        </div>
+                      )}
+
+                      {/* Time Tracking Section for Sessions */}
+                      {(m.type === "session" || m.type === "first_session") && m.status === "in_progress" && (
+                        <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200/60 dark:border-amber-800/60 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${m.timeTracker?.isRunning ? 'bg-amber-100 text-amber-600 animate-pulse' : 'bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>
+                              <Timer className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <div className="text-[10px] font-bold text-slate-500">{language === "ar" ? "الوقت المستغرق في الجلسة" : "Session Duration"}</div>
+                              <div className="text-sm font-black text-amber-700 dark:text-amber-500 font-mono">
+                                {formatDuration(getLiveDuration(m.timeTracker))}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <button
+                            type="button"
+                            onClick={() => handleToggleTimeTracker(m.id)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                              m.timeTracker?.isRunning 
+                                ? "bg-red-100 hover:bg-red-200 text-red-700 border border-red-200" 
+                                : "bg-emerald-100 hover:bg-emerald-200 text-emerald-700 border border-emerald-200"
+                            }`}
+                          >
+                            {m.timeTracker?.isRunning ? (
+                              <>
+                                <Square className="w-3.5 h-3.5" fill="currentColor" />
+                                <span>{language === "ar" ? "إنهاء الجلسة" : "End Session"}</span>
+                              </>
+                            ) : (
+                              <>
+                                <Play className="w-3.5 h-3.5" fill="currentColor" />
+                                <span>{language === "ar" ? "بدء الجلسة" : "Start Session"}</span>
+                              </>
+                            )}
+                          </button>
                         </div>
                       )}
 

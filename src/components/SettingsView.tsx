@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import PhoneInputWithCountry from "./PhoneInputWithCountry";
 import { 
   AdminCustomSection, 
@@ -36,7 +36,14 @@ import {
   History,
   FileCheck,
   Settings as SettingsIcon,
-  Shield
+  Smartphone,
+  Key,
+  Shield,
+  Camera,
+  Upload,
+  Save,
+  User,
+  Image as ImageIcon
 } from "lucide-react";
 
 interface SettingsViewProps {
@@ -127,8 +134,64 @@ export default function SettingsView({
   const t = (key: keyof typeof TRANSLATIONS.en) => TRANSLATIONS[language][key];
 
   const [activeMainTab, setActiveMainTab] = useState<
-    "program_sections" | "users_accounts" | "permissions_matrix" | "connected_devices" | "licensing_security" | "general_preferences" | "data_sync_security"
-  >("program_sections");
+    "user_profile" | "program_sections" | "users_accounts" | "permissions_matrix" | "connected_devices" | "licensing_security" | "general_preferences" | "data_sync_security" | "advanced_security"
+  >("user_profile");
+
+  // User Profile & System Preferences State
+  const [profileName, setProfileName] = useState(currentUser.name || "الأستاذ وسام الشناوي");
+  const [profilePhone, setProfilePhone] = useState(currentUser.phone || "01283233555");
+  const [profileEmail, setProfileEmail] = useState(currentUser.email || "wesam.elshenawey@gmail.com");
+  const [profileTitle, setProfileTitle] = useState(() => localStorage.getItem("law_user_title") || "المحامي بالنقض والدستورية العليا");
+  const [profileBarId, setProfileBarId] = useState(() => localStorage.getItem("law_user_bar_id") || "نقابة المحامين - قيد رقم 184592");
+  const [profileOfficeAddress, setProfileOfficeAddress] = useState(() => localStorage.getItem("law_user_office_address") || "القاهرة / الزقازيق / الشرقية");
+  const [profileAvatar, setProfileAvatar] = useState<string>(() => {
+    return localStorage.getItem("law_user_avatar") || currentUser.avatar || "";
+  });
+  const [profileScreenScale, setProfileScreenScale] = useState<string>(() => localStorage.getItem("law_screen_scale") || "90");
+  const [profileFontScale, setProfileFontScale] = useState<string>(() => localStorage.getItem("law_font_scale") || "large");
+  const [profileSaveSuccess, setProfileSaveSuccess] = useState(false);
+  const profileFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAvatarFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const base64 = ev.target?.result as string;
+      setProfileAvatar(base64);
+      localStorage.setItem("law_user_avatar", base64);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveUserProfile = () => {
+    localStorage.setItem("law_user_avatar", profileAvatar);
+    localStorage.setItem("law_user_title", profileTitle);
+    localStorage.setItem("law_user_bar_id", profileBarId);
+    localStorage.setItem("law_user_office_address", profileOfficeAddress);
+    localStorage.setItem("law_screen_scale", profileScreenScale);
+    localStorage.setItem("law_font_scale", profileFontScale);
+
+    if (profileScreenScale === "90") {
+      document.documentElement.style.zoom = "0.9";
+    } else if (profileScreenScale === "80") {
+      document.documentElement.style.zoom = "0.8";
+    } else if (profileScreenScale === "100") {
+      document.documentElement.style.zoom = "1";
+    }
+
+    if (onUpdateUser && currentUser.id) {
+      onUpdateUser(currentUser.id, {
+        name: profileName,
+        phone: profilePhone,
+        email: profileEmail,
+        avatar: profileAvatar
+      });
+    }
+
+    setProfileSaveSuccess(true);
+    setTimeout(() => setProfileSaveSuccess(false), 4000);
+  };
 
   const [licenseHolder, setLicenseHolder] = useState("");
   const [licensePhone, setLicensePhone] = useState("");
@@ -181,6 +244,19 @@ export default function SettingsView({
       </div>
 
       <div className="flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-800 pb-2 overflow-x-auto hide-scrollbar">
+        {/* 0. User Profile & System Preferences (Primary) */}
+        <button
+          onClick={() => setActiveMainTab("user_profile")}
+          className={`flex-1 min-w-[170px] py-2.5 px-3 rounded-xl text-xs font-black transition cursor-pointer flex items-center justify-center gap-2 ${
+            activeMainTab === "user_profile"
+              ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md scale-[1.01]"
+              : "text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800"
+          }`}
+        >
+          <User className="w-4 h-4" />
+          <span>إعدادات المستخدم والصورة وضبط البرنامج</span>
+        </button>
+
         {/* 1. Program Modules & Departments */}
         <button
           onClick={() => setActiveMainTab("program_sections")}
@@ -271,10 +347,287 @@ export default function SettingsView({
           <ShieldCheck className="w-4 h-4" />
           <span>أمان البيانات والمزامنة</span>
         </button>
+        {/* 8. Advanced Security */}
+        <button
+          onClick={() => setActiveMainTab("advanced_security")}
+          className={`flex-1 min-w-[140px] py-2.5 px-3 rounded-xl text-xs font-black transition cursor-pointer flex items-center justify-center gap-2 ${
+            activeMainTab === "advanced_security"
+              ? "bg-amber-500 text-slate-950 shadow-md scale-[1.01]"
+              : "text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800"
+          }`}
+        >
+          <Shield className="w-4 h-4" />
+          <span>الأمان المتقدم (2FA)</span>
+        </button>
       </div>
       
       {/* ========================================================================= */}
-{/* 1. PROGRAM MODULES & DEPARTMENTS TAB                                      */}
+      {/* 0. USER PROFILE & SYSTEM PREFERENCES TAB (PRIMARY)                        */}
+      {/* ========================================================================= */}
+      {activeMainTab === "user_profile" && (
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border-2 border-slate-200 dark:border-slate-800 shadow-sm space-y-6 text-right" dir="rtl">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-5 border-b border-slate-200 dark:border-slate-800">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-gradient-to-tr from-amber-500 to-amber-600 text-slate-950 rounded-2xl shadow-md">
+                <User className="w-6 h-6 stroke-[2.5]" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-slate-900 dark:text-amber-400">
+                  الملف الشخصي للمحامي وإعدادات المستخدم وضبط البرنامج
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  تعديل الاسم والبيانات القضائية، تحديث الصورة الشخصية، وضبط مقاسات الشاشة والخطوط لكامل أقسام البرنامج
+                </p>
+              </div>
+            </div>
+
+            {/* Top Save Button */}
+            <button
+              onClick={handleSaveUserProfile}
+              className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black rounded-xl shadow-md hover:scale-105 active:scale-95 transition cursor-pointer flex items-center gap-2"
+            >
+              <Save className="w-4 h-4" />
+              <span>حفظ التعديلات وضبط البرنامج 💾</span>
+            </button>
+          </div>
+
+          {/* Success Banner */}
+          {profileSaveSuccess && (
+            <div className="p-4 bg-emerald-500/10 border-2 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 rounded-2xl text-xs font-black flex items-center gap-3 animate-in fade-in">
+              <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-emerald-500" />
+              <span>✅ تم حفظ بيانات المستخدم والصورة الشخصية وتطبيق إعدادات ضبط البرنامج بنجاح!</span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Column 1: Profile Photo (الصورة الشخصية) */}
+            <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col items-center text-center space-y-4">
+              <span className="text-xs font-black text-slate-700 dark:text-slate-300">الصورة الشخصية المعتمدة للمستخدم</span>
+              
+              <div className="relative group">
+                <div className="w-32 h-32 rounded-3xl overflow-hidden border-4 border-amber-500/40 shadow-xl bg-slate-900 flex items-center justify-center">
+                  {profileAvatar ? (
+                    <img 
+                      src={profileAvatar} 
+                      alt="الصورة الشخصية" 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center text-amber-400">
+                      <User className="w-14 h-14" />
+                      <span className="text-[10px] font-bold mt-1 text-slate-400">بدون صورة</span>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => profileFileInputRef.current?.click()}
+                  className="absolute -bottom-2 -left-2 p-2.5 bg-amber-500 text-slate-950 rounded-2xl shadow-lg hover:scale-110 active:scale-95 transition cursor-pointer border-2 border-white dark:border-slate-900"
+                  title="تغيير الصورة الشخصية"
+                >
+                  <Camera className="w-4 h-4 stroke-[2.5]" />
+                </button>
+              </div>
+
+              {/* Hidden file input */}
+              <input
+                ref={profileFileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarFileSelected}
+                className="hidden"
+              />
+
+              <div className="space-y-2 w-full pt-1">
+                <button
+                  type="button"
+                  onClick={() => profileFileInputRef.current?.click()}
+                  className="w-full py-2 px-3 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <Upload className="w-3.5 h-3.5 text-amber-500" />
+                  <span>رفع صورة شخصية من الجهاز</span>
+                </button>
+
+                {profileAvatar && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfileAvatar("");
+                      localStorage.removeItem("law_user_avatar");
+                    }}
+                    className="w-full py-1.5 px-3 text-red-500 hover:text-red-600 text-[11px] font-bold hover:underline transition cursor-pointer"
+                  >
+                    إزالة الصورة واستعادة الرمز الافتراضي
+                  </button>
+                )}
+              </div>
+
+              <div className="p-3 bg-amber-500/5 border border-amber-500/20 rounded-xl w-full text-right text-[11px] text-slate-500 space-y-1">
+                <div>• تظهر صورتك في أعلى البرنامج وترويسة المذكرات.</div>
+                <div>• يدعم صيغ JPG, PNG, WEBP بدقة فائقة.</div>
+              </div>
+            </div>
+
+            {/* Column 2 & 3: Profile Details & System Settings */}
+            <div className="lg:col-span-2 space-y-5">
+              {/* Profile Details Form */}
+              <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+                <h4 className="text-xs font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <User className="w-4 h-4 text-amber-500" />
+                  <span>البيانات الشخصية والقضائية للمحامي</span>
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      الاسم الكامل للمستخدم / المحامي:
+                    </label>
+                    <input
+                      type="text"
+                      value={profileName}
+                      onChange={(e) => setProfileName(e.target.value)}
+                      className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl font-bold outline-none focus:border-amber-500 text-slate-900 dark:text-slate-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      رقم الهاتف المعتمد (مع كود الدولة):
+                    </label>
+                    <input
+                      type="text"
+                      value={profilePhone}
+                      onChange={(e) => setProfilePhone(e.target.value)}
+                      className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl font-bold font-mono outline-none focus:border-amber-500 text-slate-900 dark:text-slate-100"
+                      dir="ltr"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      البريد الإلكتروني المعتمد:
+                    </label>
+                    <input
+                      type="email"
+                      value={profileEmail}
+                      onChange={(e) => setProfileEmail(e.target.value)}
+                      className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl font-bold font-mono outline-none focus:border-amber-500 text-slate-900 dark:text-slate-100"
+                      dir="ltr"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      الدرجة واللقب القضائي:
+                    </label>
+                    <input
+                      type="text"
+                      value={profileTitle}
+                      onChange={(e) => setProfileTitle(e.target.value)}
+                      placeholder="محامي بالنقض والدستورية العليا"
+                      className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl font-bold outline-none focus:border-amber-500 text-slate-900 dark:text-slate-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      رقم القيد بنقابة المحامين:
+                    </label>
+                    <input
+                      type="text"
+                      value={profileBarId}
+                      onChange={(e) => setProfileBarId(e.target.value)}
+                      className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl font-bold outline-none focus:border-amber-500 text-slate-900 dark:text-slate-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      عنوان ومقر المكتب الرئيسي:
+                    </label>
+                    <input
+                      type="text"
+                      value={profileOfficeAddress}
+                      onChange={(e) => setProfileOfficeAddress(e.target.value)}
+                      className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl font-bold outline-none focus:border-amber-500 text-slate-900 dark:text-slate-100"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Program Layout & Display Settings (ضبط البرنامج والعرض) */}
+              <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+                <h4 className="text-xs font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <Monitor className="w-4 h-4 text-amber-500" />
+                  <span>ضبط مقاس الشاشة وتكبير الخط والألوان (System Display Settings)</span>
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Screen Scale Setting */}
+                  <div className="p-3.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
+                    <label className="block text-xs font-black text-slate-800 dark:text-slate-200">
+                      مقاس شاشة كامل البرنامج (Screen Scale):
+                    </label>
+                    <select
+                      value={profileScreenScale}
+                      onChange={(e) => {
+                        setProfileScreenScale(e.target.value);
+                        if (e.target.value === "90") document.documentElement.style.zoom = "0.9";
+                        else if (e.target.value === "80") document.documentElement.style.zoom = "0.8";
+                        else if (e.target.value === "100") document.documentElement.style.zoom = "1";
+                      }}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-850 border border-slate-300 dark:border-slate-700 rounded-xl font-bold outline-none focus:border-amber-500 text-slate-900 dark:text-slate-100"
+                    >
+                      <option value="90">90% (تقليل 10% من إجمالي المساحة - الوضع المحسن الموصى به)</option>
+                      <option value="100">100% (المقاس الكامل الافتراضي)</option>
+                      <option value="80">80% (المقاس المصغر بنسبة 20%)</option>
+                    </select>
+                    <p className="text-[10px] text-slate-500">
+                      يضبط الحجم الكلي لواجهة النظام لتلائم شاشتك بدون حواف زائدة.
+                    </p>
+                  </div>
+
+                  {/* Font Scale Setting */}
+                  <div className="p-3.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
+                    <label className="block text-xs font-black text-slate-800 dark:text-slate-200">
+                      حجم الخط العام للقراءة (Font Size):
+                    </label>
+                    <select
+                      value={profileFontScale}
+                      onChange={(e) => setProfileFontScale(e.target.value)}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-850 border border-slate-300 dark:border-slate-700 rounded-xl font-bold outline-none focus:border-amber-500 text-slate-900 dark:text-slate-100"
+                    >
+                      <option value="large">خط كبير وواضح ومريح للقراءة (15px - المعتمد)</option>
+                      <option value="extra_large">خط عريض ومكبر جداً للمحاكم (16px)</option>
+                      <option value="normal">خط قياسي (14px)</option>
+                    </select>
+                    <p className="text-[10px] text-slate-500">
+                      يضمن وضوح النصوص في كافة الجداول والمذكرات وشاشات الرول.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Bottom Save Action */}
+                <div className="pt-2 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleSaveUserProfile}
+                    className="px-6 py-3 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 hover:brightness-110 text-slate-950 text-xs font-black rounded-2xl shadow-lg hover:scale-105 active:scale-95 transition cursor-pointer flex items-center gap-2"
+                  >
+                    <Save className="w-4 h-4 stroke-[2.5]" />
+                    <span>حفظ التعديلات وضبط البرنامج الآن 💾</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 1. PROGRAM MODULES & DEPARTMENTS TAB                                      */}
       {/* ========================================================================= */}
       {activeMainTab === "program_sections" && (
         <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
@@ -739,6 +1092,104 @@ export default function SettingsView({
         </div>
       )}
       
+      {activeMainTab === "advanced_security" && (
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-6 text-right" dir="rtl">
+          <div className="pb-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-end flex-wrap gap-4">
+            <div>
+              <h3 className="text-base font-black text-slate-900 dark:text-amber-500 flex items-center gap-1.5 justify-start">
+                <Shield className="w-5 h-5 text-amber-500" />
+                <span>إعدادات الأمان المتقدمة والمصادقة الثنائية</span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-1 max-w-xl leading-relaxed">
+                تفعيل المصادقة الثنائية (2FA) لحماية حسابك، ومراجعة سجل الوصول والأجهزة المتصلة بالحساب.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* 2FA Section */}
+            <div className="space-y-4">
+              <h4 className="text-xs font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <Key className="w-4 h-4 text-emerald-500" />
+                المصادقة الثنائية (2FA)
+              </h4>
+              
+              <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl flex flex-col gap-4 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <h5 className="text-sm font-black text-slate-800 dark:text-slate-200">تفعيل المصادقة الثنائية</h5>
+                    <p className="text-[10px] text-slate-500">إضافة طبقة حماية إضافية تطلب كود عند تسجيل الدخول.</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" className="sr-only peer" />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-emerald-500"></div>
+                  </label>
+                </div>
+                
+                <div className="pt-3 border-t border-slate-200 dark:border-slate-800 grid grid-cols-2 gap-3">
+                  <button className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 font-bold text-xs transition cursor-pointer">
+                    <Smartphone className="w-4 h-4" />
+                    تطبيق مصادقة (Auth App)
+                  </button>
+                  <button className="flex items-center justify-center gap-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 font-bold text-xs hover:border-emerald-500 hover:text-emerald-600 transition cursor-pointer">
+                    <Mail className="w-4 h-4" />
+                    البريد الإلكتروني (Email)
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Access Logs Section */}
+            <div className="space-y-4">
+              <h4 className="text-xs font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <History className="w-4 h-4 text-sky-500" />
+                سجل الوصول والأجهزة المتصلة
+              </h4>
+
+              <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden flex flex-col">
+                <div className="p-3 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-900">
+                  <span className="text-[10px] font-bold text-slate-500">آخر عمليات تسجيل الدخول</span>
+                  <button className="text-[10px] text-red-500 font-bold hover:underline flex items-center gap-1 cursor-pointer">
+                    <LogOut className="w-3 h-3" />
+                    تسجيل الخروج من جميع الأجهزة
+                  </button>
+                </div>
+                <div className="p-2 flex flex-col gap-2 max-h-[250px] overflow-y-auto">
+                  <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 rounded-lg">
+                        <Monitor className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Chrome (Windows)</p>
+                        <p className="text-[10px] text-slate-500">القاهرة، مصر • 192.168.1.1</p>
+                      </div>
+                    </div>
+                    <div className="text-left">
+                      <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-md">الجهاز الحالي (الآن)</span>
+                    </div>
+                  </div>
+                  <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-600 rounded-lg">
+                        <Smartphone className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Safari (iPhone)</p>
+                        <p className="text-[10px] text-slate-500">الجيزة، مصر • 192.168.1.45</p>
+                      </div>
+                    </div>
+                    <div className="text-left">
+                      <p className="text-[10px] text-slate-500">منذ ساعتين</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {activeMainTab === "general_preferences" && (
         <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
           <div className="pb-4 border-b border-slate-100 dark:border-slate-800">

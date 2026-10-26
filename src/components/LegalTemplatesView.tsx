@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { cropTo3x4Portrait } from "../utils/imageUtils";
 import { 
   LegalTemplate, 
   ClientProfile, 
@@ -7,6 +8,7 @@ import {
 } from "../types";
 import { INITIAL_LEGAL_TEMPLATES } from "../data/legalTemplatesData";
 import { getClientRoleLabel } from "../utils/translations";
+import UrfiMarriageContractStudio from "./UrfiMarriageContractStudio";
 import { 
   BookOpen, 
   FileText, 
@@ -28,7 +30,14 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
-  Award
+  Award,
+  Heart,
+  Eye,
+  PenTool,
+  Columns,
+  Camera,
+  ArrowLeftRight,
+  Image as ImageIcon
 } from "lucide-react";
 
 interface LegalTemplatesViewProps {
@@ -65,6 +74,8 @@ export default function LegalTemplatesView({
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState<LegalTemplate | null>(templates[0] || null);
+  const [isUrfiStudioActive, setIsUrfiStudioActive] = useState(false);
+  const [showSidePreview, setShowSidePreview] = useState(true);
 
   // Dynamic Merge / Autofill States
   const [selectedClientId, setSelectedClientId] = useState<string>("");
@@ -77,10 +88,72 @@ export default function LegalTemplatesView({
   const [customLawyerName, setCustomLawyerName] = useState("الأستاذ المحامي");
   const [customLawyerTitle, setCustomLawyerTitle] = useState("المحامي بالنقض والدستورية العليا");
 
+  // Husband & Wife Personal Photos (Top Right: Husband | Top Left: Wife)
+  const [husbandPhoto, setHusbandPhoto] = useState<string>("");
+  const [wifePhoto, setWifePhoto] = useState<string>("");
+
   // Editable output text
   const [renderedText, setRenderedText] = useState<string>("");
   const [isCopied, setIsCopied] = useState(false);
   const [isSavedToCase, setIsSavedToCase] = useState(false);
+
+  // Photo Handlers
+  const handleHusbandPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        const base64 = await cropTo3x4Portrait(file);
+        setHusbandPhoto(base64);
+      } catch (err) {
+        console.error("Failed to crop husband photo", err);
+      }
+    }
+  };
+
+  const handleWifePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        const base64 = await cropTo3x4Portrait(file);
+        setWifePhoto(base64);
+      } catch (err) {
+        console.error("Failed to crop wife photo", err);
+      }
+    }
+  };
+
+  const handleMultiplePhotosUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      if (files[0]) {
+        try {
+          const base64 = await cropTo3x4Portrait(files[0]);
+          setHusbandPhoto(base64);
+        } catch (err) {
+          console.error("Failed to crop husband photo", err);
+        }
+      }
+      if (files[1]) {
+        try {
+          const base64 = await cropTo3x4Portrait(files[1]);
+          setWifePhoto(base64);
+        } catch (err) {
+          console.error("Failed to crop wife photo", err);
+        }
+      }
+    }
+  };
+
+  const handleSwapPhotos = () => {
+    const temp = husbandPhoto;
+    setHusbandPhoto(wifePhoto);
+    setWifePhoto(temp);
+  };
+
+  const handleClearPhotos = () => {
+    setHusbandPhoto("");
+    setWifePhoto("");
+  };
 
   // New Template Modal
   const [showAddModal, setShowAddModal] = useState(false);
@@ -232,6 +305,8 @@ export default function LegalTemplatesView({
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
 
+    const hasPhotos = !!(husbandPhoto || wifePhoto);
+
     printWindow.document.write(`
       <!DOCTYPE html>
       <html dir="rtl" lang="ar">
@@ -239,26 +314,66 @@ export default function LegalTemplatesView({
         <meta charset="utf-8">
         <title>${selectedTemplate?.title || "مستند قانوني"}</title>
         <style>
-          @page { size: A4; margin: 20mm; }
+          @page { size: A4; margin: 15mm; }
           body {
             font-family: 'Amiri', 'Traditional Arabic', 'Cairo', Arial, sans-serif;
-            font-size: 14pt;
+            font-size: 13.5pt;
             line-height: 1.8;
             color: #111;
-            padding: 20px;
+            padding: 15px;
             direction: rtl;
           }
           .header {
+            position: relative;
             text-align: center;
             border-bottom: 2px solid #000;
-            padding-bottom: 12px;
-            margin-bottom: 25px;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+            min-height: ${hasPhotos ? "120px" : "auto"};
           }
-          .header h1 { margin: 0 0 5px 0; font-size: 18pt; font-weight: bold; }
-          .header p { margin: 0; font-size: 11pt; color: #444; }
+          .photo-husband {
+            float: right;
+            width: 85px;
+            text-align: center;
+            border: 2px solid #1e3a8a;
+            padding: 2px;
+            border-radius: 6px;
+            margin-left: 15px;
+            background: #f8fafc;
+          }
+          .photo-wife {
+            float: left;
+            width: 85px;
+            text-align: center;
+            border: 2px solid #9f1239;
+            padding: 2px;
+            border-radius: 6px;
+            margin-right: 15px;
+            background: #fdf2f8;
+          }
+          .photo-img {
+            width: 100%;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 4px;
+            display: block;
+          }
+          .photo-label {
+            font-size: 7.5pt;
+            font-weight: bold;
+            padding: 2px 0;
+            color: #fff;
+            margin-top: 2px;
+            border-radius: 2px;
+          }
+          .label-husband { background: #1e3a8a; }
+          .label-wife { background: #9f1239; }
+          .header h1 { margin: 0 0 5px 0; font-size: 16pt; font-weight: bold; }
+          .header p { margin: 0; font-size: 10.5pt; color: #444; }
+          .clear { clear: both; }
           .content { white-space: pre-wrap; word-break: break-word; text-align: justify; }
           .footer {
-            margin-top: 40px;
+            margin-top: 35px;
             text-align: left;
             font-weight: bold;
           }
@@ -266,8 +381,24 @@ export default function LegalTemplatesView({
       </head>
       <body>
         <div class="header">
-          <h1>ديوان المحاماة والاستشارات القانونية</h1>
-          <p>الأستاذ المحامي - المحامي بالنقض والدستورية العليا</p>
+          ${husbandPhoto ? `
+            <div class="photo-husband">
+              <img src="${husbandPhoto}" class="photo-img" alt="صورة الزوج" />
+              <div class="photo-label label-husband">الطرف الأول (الزوج)</div>
+            </div>
+          ` : ''}
+          ${wifePhoto ? `
+            <div class="photo-wife">
+              <img src="${wifePhoto}" class="photo-img" alt="صورة الزوجة" />
+              <div class="photo-label label-wife">الطرف الثاني (الزوجة)</div>
+            </div>
+          ` : ''}
+          <div>
+            <h1>${customLawyerName || "ديوان المحاماة والاستشارات القانونية"}</h1>
+            <p>${customLawyerTitle || "المحامي بالنقض والدستورية العليا"}</p>
+            ${selectedTemplate?.id === "contract-urfi-marriage" ? `<p style="font-weight: bold; margin-top: 4px; font-size: 11pt; color: #78350f;">عـقـد زواج عـرفـي شـرعـي مـوثـق</p>` : ''}
+          </div>
+          <div class="clear"></div>
         </div>
         <div class="content">${renderedText}</div>
         <div class="footer">
@@ -289,7 +420,30 @@ export default function LegalTemplatesView({
       "xmlns='http://www.w3.org/TR/REC-html40'>"+
       "<head><meta charset='utf-8'><title>Document</title></head><body dir='rtl' style=\"font-family: 'Traditional Arabic', Arial; font-size: 14pt; line-height: 1.8;\">";
     const footer = "</body></html>";
-    const sourceHTML = header + `<div style="text-align: center; border-bottom: 2px solid #333; margin-bottom: 20px; padding-bottom: 10px;"><h2>ديوان المحاماة والاستشارات القانونية</h2><p>الأستاذ المحامي - محامٍ بالنقض والدستورية العليا</p></div><pre style="white-space: pre-wrap; font-family: inherit; font-size: 13pt;">` + renderedText + "</pre>" + footer;
+    
+    let headerHTML = `<div style="text-align: center; border-bottom: 2px solid #333; margin-bottom: 20px; padding-bottom: 10px;"><h2>${customLawyerName || "ديوان المحاماة والاستشارات القانونية"}</h2><p>${customLawyerTitle || "الأستاذ المحامي - محامٍ بالنقض والدستورية العليا"}</p></div>`;
+
+    if (husbandPhoto || wifePhoto) {
+      headerHTML = `
+        <table style="width: 100%; border-bottom: 2px solid #333; margin-bottom: 20px; padding-bottom: 10px;">
+          <tr>
+            <td style="width: 100px; text-align: center; vertical-align: top;">
+              ${husbandPhoto ? `<img src="${husbandPhoto}" width="90" height="115" style="border: 2px solid #1e3a8a;" /><div style="font-size: 9pt; font-weight: bold; background: #1e3a8a; color: white;">صورة الزوج</div>` : ''}
+            </td>
+            <td style="text-align: center; vertical-align: middle;">
+              <h2>${customLawyerName || "ديوان المحاماة والاستشارات القانونية"}</h2>
+              <p>${customLawyerTitle || "الأستاذ المحامي - محامٍ بالنقض والدستورية العليا"}</p>
+              ${selectedTemplate?.id === "contract-urfi-marriage" ? `<p style="font-weight: bold; color: #78350f;">عـقـد زواج عـرفـي شـرعـي مـوثـق</p>` : ''}
+            </td>
+            <td style="width: 100px; text-align: center; vertical-align: top;">
+              ${wifePhoto ? `<img src="${wifePhoto}" width="90" height="115" style="border: 2px solid #9f1239;" /><div style="font-size: 9pt; font-weight: bold; background: #9f1239; color: white;">صورة الزوجة</div>` : ''}
+            </td>
+          </tr>
+        </table>
+      `;
+    }
+
+    const sourceHTML = header + headerHTML + `<pre style="white-space: pre-wrap; font-family: inherit; font-size: 13pt;">` + renderedText + "</pre>" + footer;
     
     const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
     const fileDownload = document.createElement("a");
@@ -381,11 +535,24 @@ export default function LegalTemplatesView({
     setNewTags("");
   };
 
+  if (isUrfiStudioActive) {
+    return (
+      <UrfiMarriageContractStudio
+        clients={clients}
+        cases={cases}
+        currentUser={currentUser}
+        onBack={() => setIsUrfiStudioActive(false)}
+        onSaveToCaseAttachments={onSaveToCaseAttachments}
+        language={language}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6 text-right font-sans" dir="rtl">
       
       {/* 1. Header Toolbar with Extracted Add Template Button */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
         <div className="flex items-center gap-2.5">
           <div className="p-2 bg-amber-500/10 rounded-xl text-amber-500">
             <BookOpen className="w-5 h-5" />
@@ -394,10 +561,20 @@ export default function LegalTemplatesView({
             <h1 className="text-base md:text-lg font-black text-slate-900 dark:text-white">
               مكتبة القوالب القانونية والعقود الجاهزة
             </h1>
+            <p className="text-xs text-slate-500">صياغة وتعبئة العقود والمذكرات مع خاصية التوقيع الإلكتروني والمعاينة الحية</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Direct Studio Launcher Button */}
+          <button
+            onClick={() => setIsUrfiStudioActive(true)}
+            className="px-3.5 py-2 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-700 hover:to-amber-700 text-white font-black rounded-xl text-xs transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+          >
+            <Heart className="w-4 h-4 fill-current" />
+            <span>💍 استوديو عقد الزواج العرفي الموثق</span>
+          </button>
+
           <button
             onClick={() => setShowAddModal(true)}
             className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs transition flex items-center gap-1.5 shadow-sm cursor-pointer"
@@ -584,6 +761,138 @@ export default function LegalTemplatesView({
                 <span>• التوكيل: {selectedClient.poaNumber ? `رقم ${selectedClient.poaNumber} لسنة ${selectedClient.poaYear || "2026"}` : "---"}</span>
               </div>
             )}
+
+            {/* Special Callout Banner for Urfi Marriage Contract Studio */}
+            {selectedTemplate?.id === "contract-urfi-marriage" && (
+              <div className="p-3.5 bg-gradient-to-r from-rose-500/10 via-amber-500/10 to-purple-500/10 border-2 border-rose-400/40 dark:border-rose-600/40 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-sm">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-rose-500 text-white rounded-xl shadow-sm">
+                    <Heart className="w-5 h-5 fill-current" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-rose-950 dark:text-rose-200">
+                      استوديو الصياغة التفاعلي لعقد الزواج العرفي الشرعي الموثق
+                    </h4>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                      يتضمن لوحة التوقيع الإلكتروني للزوجين والشهود، إدراج صور الزوجين بالأركان، وتعبئة بيانات الموكلين بضغطة زر.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsUrfiStudioActive(true)}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-black rounded-xl text-xs transition flex items-center gap-1.5 shadow-md cursor-pointer"
+                >
+                  <PenTool className="w-4 h-4" />
+                  <span>فتح استوديو عقد الزواج والتوقيع الرقمي ✨</span>
+                </button>
+              </div>
+            )}
+
+            {/* Spouses Personal Photo Uploader Bar (For Urfi Marriage & Contracts) */}
+            {(selectedTemplate?.id === "contract-urfi-marriage" || husbandPhoto || wifePhoto) && (
+              <div className="p-3 bg-gradient-to-r from-blue-500/10 via-amber-500/10 to-rose-500/10 dark:from-blue-950/30 dark:via-amber-950/30 dark:to-rose-950/30 border border-amber-300 dark:border-amber-800/60 rounded-2xl space-y-2.5">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2 text-xs font-black text-slate-800 dark:text-slate-200">
+                    <Camera className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                    <span>📸 إدراج الصور الشخصية (أعلى يمين: الزوج | أعلى شمال: الزوجة)</span>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Upload Both Photos at Once */}
+                    <label className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 rounded-xl text-[11px] font-black cursor-pointer transition shadow-xs flex items-center gap-1">
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>رفع صورتي الزوجين معاً دفعة واحدة</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={handleMultiplePhotosUpload}
+                        className="hidden"
+                      />
+                    </label>
+
+                    {(husbandPhoto || wifePhoto) && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleSwapPhotos}
+                          className="px-2.5 py-1.5 bg-white dark:bg-slate-900 hover:bg-slate-100 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 rounded-xl text-[10.5px] font-bold transition flex items-center gap-1 cursor-pointer"
+                          title="تبديل موقع الصورتين"
+                        >
+                          <ArrowLeftRight className="w-3.5 h-3.5 text-amber-500" />
+                          <span>تبديل</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleClearPhotos}
+                          className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition"
+                          title="حذف الصور"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Micro Cards for Individual Selection */}
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  {/* Husband Upload */}
+                  <div className="flex items-center gap-2 p-2 bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/40 rounded-xl">
+                    <div className="w-10 h-12 rounded-lg border border-blue-400 bg-white dark:bg-slate-900 flex items-center justify-center overflow-hidden shrink-0">
+                      {husbandPhoto ? (
+                        <img src={husbandPhoto} alt="الزوج" className="w-full h-full object-cover" />
+                      ) : (
+                        <User className="w-5 h-5 text-blue-400" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="block text-[10.5px] font-black text-blue-950 dark:text-blue-200">
+                        صورة الزوج (أعلى يمين)
+                      </span>
+                      <label className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline font-bold cursor-pointer inline-flex items-center gap-1 mt-0.5">
+                        <Camera className="w-3 h-3" />
+                        <span>{husbandPhoto ? "تغيير صورة الزوج" : "اختيار صورة الزوج"}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleHusbandPhotoUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Wife Upload */}
+                  <div className="flex items-center gap-2 p-2 bg-rose-50/80 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/40 rounded-xl">
+                    <div className="w-10 h-12 rounded-lg border border-rose-400 bg-white dark:bg-slate-900 flex items-center justify-center overflow-hidden shrink-0">
+                      {wifePhoto ? (
+                        <img src={wifePhoto} alt="الزوجة" className="w-full h-full object-cover" />
+                      ) : (
+                        <Heart className="w-5 h-5 text-rose-400" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="block text-[10.5px] font-black text-rose-950 dark:text-rose-200">
+                        صورة الزوجة (أعلى شمال)
+                      </span>
+                      <label className="text-[10px] text-rose-600 dark:text-rose-400 hover:underline font-bold cursor-pointer inline-flex items-center gap-1 mt-0.5">
+                        <Camera className="w-3 h-3" />
+                        <span>{wifePhoto ? "تغيير صورة الزوجة" : "اختيار صورة الزوجة"}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleWifePhotoUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 2. Live Document Preview & Rich Actions */}
@@ -601,6 +910,21 @@ export default function LegalTemplatesView({
               {/* Action Buttons */}
               <div className="flex items-center gap-1.5 flex-wrap">
                 
+                {/* Toggle Side-by-Side Live Preview */}
+                <button
+                  type="button"
+                  onClick={() => setShowSidePreview(!showSidePreview)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                    showSidePreview
+                      ? "bg-amber-500 text-slate-950 font-black shadow-sm"
+                      : "bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300"
+                  }`}
+                  title="تبديل وضع المعاينة الحية المنسقة جنباً إلى جنب"
+                >
+                  <Columns className="w-3.5 h-3.5" />
+                  <span>{showSidePreview ? "معاينة مزدوجة ✓" : "معاينة مزدوجة"}</span>
+                </button>
+
                 {/* Print */}
                 <button
                   type="button"
@@ -679,15 +1003,118 @@ export default function LegalTemplatesView({
               </div>
             </div>
 
-            {/* Editable Text Area */}
-            <div className="p-4 bg-slate-50/50 dark:bg-slate-950/40 flex-1">
-              <textarea
-                rows={22}
-                value={renderedText}
-                onChange={(e) => setRenderedText(e.target.value)}
-                className="w-full p-4 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-xs leading-relaxed outline-none focus:border-amber-500 shadow-inner text-right"
-                placeholder="محتوى القالب القانوني المعبأ..."
-              />
+            {/* Main Editor & Live Preview Area */}
+            <div className={`p-4 bg-slate-50/50 dark:bg-slate-950/40 flex-1 grid ${showSidePreview ? 'grid-cols-1 xl:grid-cols-2 gap-4' : 'grid-cols-1'}`}>
+              {/* Text Area (Editing Column) */}
+              <div className="flex flex-col">
+                <div className="flex items-center justify-between pb-2 text-[11px] font-bold text-slate-500">
+                  <span>مساحة التحرير والتعديل المباشر:</span>
+                  <span className="font-mono text-[10px] text-amber-600">يمكنك التعديل هنا مباشرة</span>
+                </div>
+                <textarea
+                  rows={22}
+                  value={renderedText}
+                  onChange={(e) => setRenderedText(e.target.value)}
+                  className="w-full h-full min-h-[420px] p-4 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-xs leading-relaxed outline-none focus:border-amber-500 shadow-inner text-right"
+                  placeholder="محتوى القالب القانوني المعبأ..."
+                />
+              </div>
+
+              {/* Formatted Live Document Preview Column */}
+              {showSidePreview && (
+                <div className="flex flex-col">
+                  <div className="flex items-center justify-between pb-2 text-[11px] font-bold text-slate-500">
+                    <span className="flex items-center gap-1">
+                      <Eye className="w-3.5 h-3.5 text-blue-500" />
+                      <span>المعاينة المباشرة المنسقة للطباعة (Live Sheet):</span>
+                    </span>
+                    <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded font-mono">
+                      مزامنة آنية ⚡
+                    </span>
+                  </div>
+                  <div className="w-full h-full min-h-[420px] max-h-[550px] overflow-y-auto p-5 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-2 border-dashed border-amber-500/30 rounded-xl font-sans text-xs leading-relaxed shadow-sm scrollbar-thin">
+                    {/* Header in Preview with Photos in Top Corners */}
+                    <div className="relative border-b-2 border-slate-800 pb-3 mb-4 min-h-[90px]">
+                      
+                      {/* Top Right: Husband Photo Frame */}
+                      {(selectedTemplate?.id === "contract-urfi-marriage" || husbandPhoto || wifePhoto) && (
+                        <div className="absolute right-0 top-0 text-center">
+                          <label className="w-16 h-20 rounded-lg border-2 border-blue-600/80 p-0.5 bg-slate-50 dark:bg-slate-950 shadow flex flex-col items-center justify-center overflow-hidden cursor-pointer group hover:border-blue-700 transition">
+                            {husbandPhoto ? (
+                              <img src={husbandPhoto} alt="الزوج" className="w-full h-full object-cover rounded" />
+                            ) : (
+                              <div className="flex flex-col items-center justify-center text-slate-400 text-[8px] space-y-0.5">
+                                <User className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform" />
+                                <span className="font-bold">صورة الزوج</span>
+                              </div>
+                            )}
+                            <div className="absolute bottom-0 inset-x-0 bg-blue-900/90 text-white text-[7px] py-0.5 font-bold">
+                              الطرف الأول
+                            </div>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleHusbandPhotoUpload}
+                              className="hidden"
+                            />
+                          </label>
+                        </div>
+                      )}
+
+                      {/* Top Left: Wife Photo Frame */}
+                      {(selectedTemplate?.id === "contract-urfi-marriage" || husbandPhoto || wifePhoto) && (
+                        <div className="absolute left-0 top-0 text-center">
+                          <label className="w-16 h-20 rounded-lg border-2 border-rose-600/80 p-0.5 bg-slate-50 dark:bg-slate-950 shadow flex flex-col items-center justify-center overflow-hidden cursor-pointer group hover:border-rose-700 transition">
+                            {wifePhoto ? (
+                              <img src={wifePhoto} alt="الزوجة" className="w-full h-full object-cover rounded" />
+                            ) : (
+                              <div className="flex flex-col items-center justify-center text-slate-400 text-[8px] space-y-0.5">
+                                <Heart className="w-5 h-5 text-rose-400 group-hover:scale-110 transition-transform" />
+                                <span className="font-bold">صورة الزوجة</span>
+                              </div>
+                            )}
+                            <div className="absolute bottom-0 inset-x-0 bg-rose-900/90 text-white text-[7px] py-0.5 font-bold">
+                              الطرف الثاني
+                            </div>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleWifePhotoUpload}
+                              className="hidden"
+                            />
+                          </label>
+                        </div>
+                      )}
+
+                      {/* Center Title */}
+                      <div className={`text-center ${selectedTemplate?.id === "contract-urfi-marriage" || husbandPhoto || wifePhoto ? 'px-20' : ''}`}>
+                        <h4 className="font-black text-sm text-slate-900 dark:text-white">
+                          {customLawyerName || "ديوان المحاماة والاستشارات القانونية"}
+                        </h4>
+                        <p className="text-[10.5px] text-slate-500 font-bold">
+                          {customLawyerTitle || "المحاماة والاستشارات القانونية"}
+                        </p>
+                        {selectedTemplate?.id === "contract-urfi-marriage" && (
+                          <span className="inline-block mt-1 text-[11px] font-black text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-950/60 px-2 py-0.5 rounded-full border border-amber-300 dark:border-amber-800">
+                            عـقـد زواج عـرفـي شـرعـي
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Body in Preview */}
+                    <pre className="whitespace-pre-wrap font-sans text-xs text-slate-800 dark:text-slate-200 leading-relaxed">
+                      {renderedText}
+                    </pre>
+
+                    {/* Seal in Preview */}
+                    <div className="mt-6 pt-3 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center text-[10px] text-slate-400">
+                      <span>ختم وتوقيع المحامي المسؤول</span>
+                      <span>حرر بتاريخ {new Date().toLocaleDateString("ar-EG")}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Seal Footer info */}

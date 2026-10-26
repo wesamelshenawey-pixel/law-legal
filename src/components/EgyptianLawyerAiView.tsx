@@ -527,8 +527,8 @@ ${textToSend}`;
   });
 
   return (
-    <div className="w-full min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 lg:p-8 font-sans" dir="rtl">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="w-full min-h-full bg-slate-950 text-slate-100 p-2 sm:p-4 rounded-3xl border border-slate-800/80 font-sans" dir="rtl">
+      <div className="w-full mx-auto space-y-4">
 
         {/* 1. HERO BRAND BANNER */}
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-amber-950/40 to-slate-900 border border-amber-500/30 p-6 sm:p-8 shadow-2xl">

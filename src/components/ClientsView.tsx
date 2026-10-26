@@ -2,31 +2,41 @@ import React, { useState, useMemo } from "react";
 import { ClientProfile, OpponentProfile, LeadProfile, PlatformUser, UserRole, CaseRecord, FeeTransfer } from "../types";
 import { INITIAL_COURTS } from "../utils/staticData";
 import AddClientWizardModal from "./AddClientWizardModal";
+import BulkContactImportModal from "./BulkContactImportModal";
 import PhoneInputWithCountry from "./PhoneInputWithCountry";
+import ClientFeeDetailsModal from "./ClientFeeDetailsModal";
 import { 
   Users, 
   Settings, 
   Plus, 
   Printer, 
-  CheckCircle,
-  FileSpreadsheet,
-  Lock,
-  Smartphone,
-  Eye,
-  Briefcase,
-  Layers,
-  FileText,
-  UploadCloud,
-  QrCode,
-  Globe,
-  Contact,
-  RefreshCw,
-  UserPlus,
-  DollarSign,
-  TrendingUp,
-  Coins,
-  ShieldCheck,
-  Award
+  CheckCircle, 
+  FileSpreadsheet, 
+  Lock, 
+  Smartphone, 
+  Eye, 
+  Briefcase, 
+  Layers, 
+  FileText, 
+  UploadCloud, 
+  QrCode, 
+  Globe, 
+  Contact, 
+  RefreshCw, 
+  UserPlus, 
+  DollarSign, 
+  TrendingUp, 
+  Coins, 
+  ShieldCheck, 
+  Award,
+  Database,
+  Sparkles,
+  Edit,
+  Trash2,
+  ArrowRight,
+  X,
+  CheckSquare,
+  Square
 } from "lucide-react";
 import { 
   getStoredWorkspaceToken, 
@@ -48,11 +58,15 @@ interface ClientsViewProps {
   onUpdateUserPassword: (phone: string, pass: string) => void;
   onImportLeads?: (newLeads: LeadProfile[]) => void;
   onUpdateClient?: (id: string, updatedFields: Partial<ClientProfile>) => void;
+  onDeleteClient?: (id: string) => void;
+  onBulkDeleteClients?: (ids: string[]) => void;
   currentUser: PlatformUser;
   casesCount?: number;
   onOpenPhoneSync?: () => void;
   onOpenDocumentManager?: (section: string, label: string) => void;
   onNavigateToOcr?: () => void;
+  language?: "ar" | "en";
+  onOpenFeeDetails?: (client: ClientProfile) => void;
 }
 
 export default function ClientsView({
@@ -71,12 +85,56 @@ export default function ClientsView({
   currentUser,
   onOpenPhoneSync,
   onOpenDocumentManager,
-  onNavigateToOcr
+  onNavigateToOcr,
+  language = "ar",
+  onOpenFeeDetails,
+  onDeleteClient,
+  onBulkDeleteClients
 }: ClientsViewProps) {
   const [activeTab, setActiveTab] = useState<"clients" | "opponents" | "online" | "leads" | "permissions">("clients");
-  const [showAddModal, setShowAddModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showAddModal, setShowAddModal] = useState(false);
   const [selectedLeadForConversion, setSelectedLeadForConversion] = useState<LeadProfile | null>(null);
+  const [selectedClientForFeeModal, setSelectedClientForFeeModal] = useState<ClientProfile | null>(null);
+
+  // Client Multi-Selection & Edit/Delete States
+  const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
+  const [editingClient, setEditingClient] = useState<ClientProfile | null>(null);
+
+  const toggleSelectClient = (id: string) => {
+    setSelectedClientIds(prev => 
+      prev.includes(id) ? prev.filter(cId => cId !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllClients = () => {
+    if (selectedClientIds.length === filteredClients.length) {
+      setSelectedClientIds([]);
+    } else {
+      setSelectedClientIds(filteredClients.map(c => c.id));
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedClientIds.length === 0) return;
+    if (window.confirm(`هل أنت متأكد من مسح ${selectedClientIds.length} موكلين نهائياً؟`)) {
+      if (onBulkDeleteClients) {
+        onBulkDeleteClients(selectedClientIds);
+      } else if (onDeleteClient) {
+        selectedClientIds.forEach(id => onDeleteClient(id));
+      }
+      setSelectedClientIds([]);
+    }
+  };
+
+  const handleSaveEditedClient = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingClient) return;
+    if (onUpdateClient) {
+      onUpdateClient(editingClient.id, editingClient);
+    }
+    setEditingClient(null);
+  };
 
   // Dynamic Client Profitability Map calculated from FeesView data & Client Profiles
   const clientProfitabilityMap = useMemo(() => {
@@ -225,9 +283,30 @@ export default function ClientsView({
 
   // Google Contacts State
   const [showContactsModal, setShowContactsModal] = useState(false);
+  const [showBulkImportModal, setShowBulkImportModal] = useState(false);
   const [googleContacts, setGoogleContacts] = useState<GoogleContact[]>([]);
   const [isLoadingContacts, setIsLoadingContacts] = useState(false);
   const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
+
+  const handleBulkAddClients = (newClients: ClientProfile[]) => {
+    newClients.forEach(c => onAddClient(c));
+    setSyncStatusMsg(`⚡ تم بنجاح استيراد وحفظ ${newClients.length.toLocaleString()} موكل في قاعدة بيانات المكتب!`);
+    setTimeout(() => setSyncStatusMsg(null), 6000);
+  };
+
+  const handleBulkAddOpponents = (newOpponents: OpponentProfile[]) => {
+    newOpponents.forEach(o => onAddOpponent(o));
+    setSyncStatusMsg(`⚡ تم بنجاح استيراد وحفظ ${newOpponents.length.toLocaleString()} خصم قضائي في السجلات!`);
+    setTimeout(() => setSyncStatusMsg(null), 6000);
+  };
+
+  const handleBulkAddLeads = (newLeads: LeadProfile[]) => {
+    if (onImportLeads) {
+      onImportLeads(newLeads);
+    }
+    setSyncStatusMsg(`⚡ تم بنجاح استيراد وحفظ ${newLeads.length.toLocaleString()} عميل محتمل في سجل الإكسيل والمتابعة!`);
+    setTimeout(() => setSyncStatusMsg(null), 6000);
+  };
 
   const handleOpenGoogleContactsModal = () => {
     let tokenState = getStoredWorkspaceToken();
@@ -442,6 +521,18 @@ export default function ClientsView({
             </button>
           )}
 
+          {/* Massive Bulk Contact Import Engine (Up to 10,000) */}
+          <button
+            id="open-bulk-contacts-import-modal-btn"
+            onClick={() => setShowBulkImportModal(true)}
+            className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 text-xs font-black rounded-xl flex items-center gap-1.5 cursor-pointer shadow-md transition-all active:scale-95 border border-amber-400"
+            title="منظومة استيراد حتى 10,000 جهة اتصال (شيت إكسيل، نسخ ولصق، Google، حسابات أخرى، vCard)"
+          >
+            <Database className="w-4 h-4" />
+            <span>استيراد حتى ١٠,٠٠٠ جهة اتصال</span>
+            <span className="text-[10px] bg-slate-950/20 px-1.5 py-0.2 rounded-full font-mono">10K</span>
+          </button>
+
           {/* Google Contacts Sync Button */}
           <button
             id="sync-google-contacts-btn"
@@ -608,8 +699,12 @@ export default function ClientsView({
                   </div>
                   <h4 className="text-sm font-bold text-slate-900 pl-16">{c.name}</h4>
                   
-                  {/* CLIENT PROFITABILITY BADGE */}
-                  <div className="bg-gradient-to-r from-amber-50/80 via-white to-amber-50/50 p-2.5 rounded-xl border border-amber-200/80 space-y-1.5">
+                  {/* CLIENT PROFITABILITY BADGE (CLICKABLE) */}
+                  <div 
+                    onClick={() => onOpenFeeDetails ? onOpenFeeDetails(c) : setSelectedClientForFeeModal(c)}
+                    className="bg-gradient-to-r from-amber-50/80 via-white to-amber-50/50 p-2.5 rounded-xl border border-amber-200/80 space-y-1.5 cursor-pointer hover:border-amber-400 hover:shadow-sm transition"
+                    title={language === "en" ? "Click to view full fee details & print invoice" : "انقر لعرض كشف حساب الأتعاب وطباعة الفاتورة"}
+                  >
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-bold text-slate-700 flex items-center gap-1">
                         <TrendingUp className="w-3 h-3 text-amber-600" />
@@ -657,6 +752,19 @@ export default function ClientsView({
                     <p><span className="text-slate-400 ml-1">المحكمة:</span> <span className="text-slate-700 truncate">{c.competentCourt}</span></p>
                     <p><span className="text-slate-400 ml-1">باقي الأتعاب:</span> <span className="text-amber-600 font-bold">{c.remainingFees} EGP</span></p>
                     <p><span className="text-slate-400 ml-1">باصورد الدخول:</span> <span className="text-amber-700 font-mono font-bold bg-amber-50 border border-amber-100 px-1 py-0.5 rounded">{c.password || "غير مسجل"}</span></p>
+                  </div>
+
+                  {/* PROMINENT DETAILED FEE & INVOICE BUTTON */}
+                  <div className="pt-2 border-t border-slate-200/60">
+                    <button
+                      type="button"
+                      onClick={() => onOpenFeeDetails ? onOpenFeeDetails(c) : setSelectedClientForFeeModal(c)}
+                      className="w-full py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-xs rounded-xl flex items-center justify-center gap-1.5 transition shadow-sm cursor-pointer active:scale-98"
+                      title={language === "en" ? "View Fee Details, Payments Ledger & Print Invoice" : "عرض تفاصيل الأتعاب والمستحقات وطباعة الفاتورة الرسمية"}
+                    >
+                      <DollarSign className="w-4 h-4 text-slate-950" />
+                      <span>{language === "en" ? "View Fees & Print Invoice" : "تفاصيل الأتعاب والمتبقي والفاتورة"}</span>
+                    </button>
                   </div>
 
                   {/* Document locker action for admins */}
@@ -783,7 +891,41 @@ export default function ClientsView({
         {/* TAB 4: CONTACTS LEADS EXCEL IMPORTED */}
         {activeTab === "leads" && (
           <div className="space-y-6">
-            <h3 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-2">استيراد الموكلين والخصوم (فصل الأطراف)</h3>
+            
+            {/* MASSIVE BULK IMPORT HERO CARD (UP TO 10,000 CONTACTS) */}
+            <div className="bg-gradient-to-l from-amber-500 via-amber-600 to-amber-500 text-slate-950 p-5 rounded-2xl shadow-lg border border-amber-400 flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-slate-950 text-amber-400 rounded-2xl shadow-inner font-black">
+                  <Database className="w-7 h-7" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-black text-slate-950">
+                      محرك الاستيراد والتوليد الجماعي العملاق (سعة حتى ١٠,٠٠٠ جهة اتصال)
+                    </h3>
+                    <span className="text-[10px] bg-slate-950 text-amber-300 px-2 py-0.5 rounded-full font-bold">
+                      Excel / Paste / Google / vCard
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-900 font-medium mt-0.5">
+                    استيراد شيتات إكسيل ضخمة، نسخ ولصق آلاف الأسطر، مزامنة حسابات Google، قراءة ملفات vCard، أو توليد جهات اتصال مصرية معتمدة.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowBulkImportModal(true)}
+                className="px-5 py-2.5 bg-slate-950 hover:bg-slate-900 text-amber-300 font-black text-xs rounded-xl shadow-md transition flex items-center gap-2 cursor-pointer flex-shrink-0"
+              >
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                <span>فتح منظومة الاستيراد الذكية</span>
+              </button>
+            </div>
+
+            <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+              <h3 className="text-base font-bold text-slate-900">استيراد الموكلين والخصوم السريع (فصل الأطراف)</h3>
+              <span className="text-xs text-slate-500 font-mono">العدد المسجل: {leads.length}</span>
+            </div>
             <p className="text-xs text-slate-500 leading-relaxed font-sans">
               قم بلصق جهات الاتصال أو شيت الإكسيل هنا. يتم فصل الموكلين عن الخصوم تلقائياً لضمان عدم اختلاط سجلات المكتب.
             </p>
@@ -1251,6 +1393,29 @@ export default function ClientsView({
           </div>
         </div>
       )}
+
+      {/* MASSIVE BULK CONTACT IMPORT & GENERATOR ENGINE (UP TO 10,000 CONTACTS) */}
+      <BulkContactImportModal
+        isOpen={showBulkImportModal}
+        onClose={() => setShowBulkImportModal(false)}
+        onBulkAddClients={handleBulkAddClients}
+        onBulkAddOpponents={handleBulkAddOpponents}
+        onBulkAddLeads={handleBulkAddLeads}
+        existingClients={clients}
+        existingOpponents={opponents}
+        existingLeads={leads}
+        language={language}
+      />
+
+      {/* CLIENT DETAILED FEE INFORMATION & PRINTABLE INVOICE MODAL */}
+      <ClientFeeDetailsModal
+        isOpen={!!selectedClientForFeeModal}
+        onClose={() => setSelectedClientForFeeModal(null)}
+        client={selectedClientForFeeModal}
+        fees={fees}
+        language={language}
+        currentUser={currentUser}
+      />
 
     </div>
   );

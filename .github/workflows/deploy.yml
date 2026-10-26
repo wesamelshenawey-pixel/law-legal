@@ -38,7 +38,10 @@ jobs:
         run: npm ci || npm install
 
       - name: Build Application for Production
-        run: npm run build
+        run: |
+          npm run build
+          touch ./dist/.nojekyll
+          ls -la ./dist
         env:
           NODE_ENV: production
 

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { CaseRecord, ClientProfile, PlatformUser, OpponentProfile } from "../types";
+import { CaseRecord, ClientProfile, PlatformUser, OpponentProfile, HandwritingProfile, HandwritingSample } from "../types";
 import GoldenEagleEmblem from "./GoldenEagleEmblem";
 import {
   Scan,
@@ -46,7 +46,21 @@ import {
   Languages,
   GitCompare,
   ZoomIn,
-  X
+  Split,
+  History,
+  GraduationCap,
+  PenTool,
+  BookOpen,
+  Award,
+  Plus,
+  X,
+  Microscope,
+  Dna,
+  Stamp,
+  Globe,
+  Cpu,
+  MessageSquare,
+  FlaskConical
 } from "lucide-react";
 import { 
   getStoredWorkspaceToken, 
@@ -65,6 +79,12 @@ import OcrContractClausesAnalysis from "./OcrContractClausesAnalysis";
 import OcrTranslationHub from "./OcrTranslationHub";
 import OcrDocumentComparator from "./OcrDocumentComparator";
 import OcrPrintPreviewModal from "./OcrPrintPreviewModal";
+import OcrBatchQueue, { BatchQueueItem } from "./OcrBatchQueue";
+import OcrSideBySideCorrector from "./OcrSideBySideCorrector";
+import OcrMultiPageCaseSplitter from "./OcrMultiPageCaseSplitter";
+import OcrProcessingHistory, { OcrHistoryRecord } from "./OcrProcessingHistory";
+import OcrForensicScienceLab from "./OcrForensicScienceLab";
+import OcrDocumentChatAssistant from "./OcrDocumentChatAssistant";
 
 interface SmartOcrStudioProps {
   currentUser: PlatformUser;
@@ -91,7 +111,7 @@ interface UploadedScanItem {
   filter?: "normal" | "bw" | "grayscale" | "inverted";
 }
 
-interface ExtractedLegalEntities {
+export interface ExtractedLegalEntities {
   clientName: string;
   nationalId?: string;
   phone?: string;
@@ -103,6 +123,113 @@ interface ExtractedLegalEntities {
   subject?: string;
   demands?: string;
 }
+
+// Initial Default Handwriting Profiles for Egyptian Legal Practices
+const INITIAL_HANDWRITING_PROFILES: HandwritingProfile[] = [
+  {
+    id: "hw-prof-lawyer-wesam",
+    name: "خط الأستاذ وسام الشناوي (مذكرات الدفاع والنقض)",
+    description: "نمط خط الرقعة المصري السريع للمحامي المعتمد مع تشابك في النونات وصيغ الدفوع القانونية",
+    writerName: "الأستاذ وسام أحمد الشناوي",
+    defaultSubtype: "defense_draft",
+    calibrationStatus: "calibrated",
+    accuracyScore: 99.2,
+    detectedStyle: "خط رقعة مصري كلاسيكي سريع عالي التماسك",
+    systemCalibrationGuide: "الكاتب يربط السين بالراء مباشرة بدون أسنان مرتفعة، ويكتب الأرقام بخط عربي مشرق دقيق، ويكتب لفظ الجلالة وتأشيرات المذكرات بحجم بارز.",
+    lastCalibratedAt: "2026-08-20",
+    isDefault: true,
+    samples: [
+      {
+        id: "sample-1",
+        title: "دفوع الشكل وبطلان القبض",
+        category: "pleadings",
+        groundTruthText: "أولاً: الدفع ببطلان إجراءات القبض والتفتيش لانتفاء حالة التلبس المنصوص عليها بالمادة ٣٠ من قانون الإجراءات الجنائية.",
+        writerName: "الأستاذ وسام الشناوي",
+        penType: "fountain",
+        accuracyScore: 99,
+        createdAt: "2026-08-15"
+      },
+      {
+        id: "sample-2",
+        title: "طلبات البراءة الختامية",
+        category: "pleadings",
+        groundTruthText: "بناءً عليه يلتمس دفاع المتهم أصلياً الحكم بالبراءة تأسيساً على انعدام صلة المتهم بالحرز وانتفاء أركان الجريمة.",
+        writerName: "الأستاذ وسام الشناوي",
+        penType: "gel",
+        accuracyScore: 100,
+        createdAt: "2026-08-18"
+      },
+      {
+        id: "sample-3",
+        title: "أرقام وتواريخ الاستئناف",
+        category: "numbers_dates",
+        groundTruthText: "قيدت برقم ٤٨٩٢ لسنة ٢٠٢٦ جنح مستأنف أكتوبر بجلسة السبت الموافق ١٢ / ٩ / ٢٠٢٦.",
+        writerName: "الأستاذ وسام الشناوي",
+        penType: "ballpoint",
+        accuracyScore: 98,
+        createdAt: "2026-08-19"
+      }
+    ]
+  },
+  {
+    id: "hw-prof-court-clerk",
+    name: "خط كاتب جلسات محاكم الاستئناف والجنايات",
+    description: "نمط خط الرقعة القضائي السريع المستخدم في رول وقرارات وتأجيلات الجلسات",
+    writerName: "أمين سر الجلسة",
+    defaultSubtype: "court_minutes",
+    calibrationStatus: "calibrated",
+    accuracyScore: 98.4,
+    detectedStyle: "خط كتاب محاكم سريع ذو اختصارات دارجة",
+    systemCalibrationGuide: "الكاتب يستخدم اختصارات مثل (ق للمحكمة، ت لجلسة، للاطلاع وسداد الرسم، حبس شهر مع الشغل وكفالة).",
+    lastCalibratedAt: "2026-08-10",
+    samples: [
+      {
+        id: "sample-clerk-1",
+        title: "قرار تأجيل وسداد رسم",
+        category: "minutes",
+        groundTruthText: "قررت المحكمة تأجيل نظر الدعوى لجلسة الأحد الموافق ٤ / ١٠ / ٢٠٢٦ لإعلان المتهم بالدعوى المدنية وسداد الرسم المقرر قانوناً.",
+        writerName: "كاتب الجلسة",
+        penType: "ballpoint",
+        accuracyScore: 98,
+        createdAt: "2026-08-10"
+      },
+      {
+        id: "sample-clerk-2",
+        title: "إثبات حضور الدفاع",
+        category: "minutes",
+        groundTruthText: "حضر الأستاذ وسام الشناوي المحامي وكيلاً عن المتهم وقدم حافظة مستندات طويت على أصل التوكيل وصورة رسمية من الحكم المعارض فيه.",
+        writerName: "كاتب الجلسة",
+        penType: "ballpoint",
+        accuracyScore: 99,
+        createdAt: "2026-08-10"
+      }
+    ]
+  },
+  {
+    id: "hw-prof-promissory-receipt",
+    name: "خط إيصالات الأمانة والشيكات العرفية",
+    description: "نمط خط اليد في كتابة إيصالات الأمانة والتفقيط المالي والأرقام القومية",
+    writerName: "محرر الإيصال العرفي",
+    defaultSubtype: "promissory_receipt",
+    calibrationStatus: "calibrated",
+    accuracyScore: 99.5,
+    detectedStyle: "خط يد عرفي مع تركيز على تفقيط المبالغ",
+    systemCalibrationGuide: "التركيز على تفقيط المبالغ بالحروف (فقط وقدره ... لا غير) والأرقام الثلاثية والرباعية لأسماء المستلمين والضامنين.",
+    lastCalibratedAt: "2026-08-12",
+    samples: [
+      {
+        id: "sample-rec-1",
+        title: "تفقيط مالي لإيصال أمانة",
+        category: "receipts",
+        groundTruthText: "استلمت أنا الموقع أدناه مبلغاً وقدره ثلاثمائة وخمسون ألف جنيه مصري فقط لا غير على سبيل الأمانة لأقوم بتسليمها إلى السيد/ ...",
+        writerName: "المقر بما فيه",
+        penType: "ballpoint",
+        accuracyScore: 100,
+        createdAt: "2026-08-12"
+      }
+    ]
+  }
+];
 
 export default function SmartOcrStudio({
   currentUser,
@@ -117,9 +244,45 @@ export default function SmartOcrStudio({
   language = "ar"
 }: SmartOcrStudioProps) {
   // Navigation tabs within Smart OCR Studio
-  const [activeTab, setActiveTab] = useState<"ocr" | "flaws" | "clauses" | "translate" | "compare">("ocr");
+  const [activeTab, setActiveTab] = useState<"ocr" | "batch" | "side_by_side" | "multipage" | "history" | "flaws" | "clauses" | "translate" | "compare" | "science_forensic">("ocr");
+
+  // Active document for Side-by-Side Corrector
+  const [sideBySideDoc, setSideBySideDoc] = useState<{
+    name: string;
+    imageSrc: string;
+    rawText: string;
+    entities?: ExtractedLegalEntities;
+  } | null>(null);
+
+  // Helper to persist OCR job to history safely within localStorage quota
+  const appendOcrHistory = (newRecord: OcrHistoryRecord) => {
+    try {
+      const sanitizedRecord: OcrHistoryRecord = {
+        ...newRecord,
+        previewUrl: newRecord.previewUrl && newRecord.previewUrl.length > 4000 ? undefined : newRecord.previewUrl,
+        extractedText: newRecord.extractedText ? newRecord.extractedText.slice(0, 15000) : "",
+        aiDraftedText: newRecord.aiDraftedText ? newRecord.aiDraftedText.slice(0, 10000) : undefined,
+      };
+      const existing = localStorage.getItem("law_ocr_processing_history_v2");
+      const list: OcrHistoryRecord[] = existing ? JSON.parse(existing) : [];
+      let updated = [sanitizedRecord, ...list.filter((r) => r.id !== newRecord.id)].slice(0, 25);
+      
+      let saved = false;
+      while (!saved && updated.length > 0) {
+        try {
+          localStorage.setItem("law_ocr_processing_history_v2", JSON.stringify(updated));
+          saved = true;
+        } catch {
+          updated.pop();
+        }
+      }
+    } catch (e) {
+      console.warn("Safe fallback for OCR history persistence:", e);
+    }
+  };
 
   const [scanItems, setScanItems] = useState<UploadedScanItem[]>([]);
+  const [autoTriggerOcr, setAutoTriggerOcr] = useState(false);
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [isProcessingAll, setIsProcessingAll] = useState(false);
   const [extractedOverallText, setExtractedOverallText] = useState("");
@@ -128,7 +291,56 @@ export default function SmartOcrStudio({
   // AI Drafting and Auto-Correction state
   const [autoCorrectSpelling, setAutoCorrectSpelling] = useState(true);
   const [extractEntities, setExtractEntities] = useState(true);
-  const [ocrMode, setOcrMode] = useState<"standard" | "national_id" | "contract" | "court_verdict" | "handwritten" | "tables" | "poa">("standard");
+  const [ocrMode, setOcrMode] = useState<"standard" | "national_id" | "contract" | "court_verdict" | "handwritten" | "tables" | "poa" | "forensic_medical_dna" | "stamp_signature">("standard");
+  const [ocrModel, setOcrModel] = useState<"gemini-3.8-flash" | "gemini-4-argon" | "gemini-3.1-flash-lite">("gemini-3.8-flash");
+  const [ocrUseSearchGrounding, setOcrUseSearchGrounding] = useState(false);
+  const [showDocumentChatModal, setShowDocumentChatModal] = useState(false);
+  const [handwritingSubtype, setHandwritingSubtype] = useState<"general" | "court_minutes" | "promissory_receipt" | "judge_endorsement" | "police_report" | "defense_draft">("general");
+  const [handwritingExtractMargins, setHandwritingExtractMargins] = useState(true);
+
+  // Handwriting AI Calibration & Training Profiles State
+  const [handwritingProfiles, setHandwritingProfiles] = useState<HandwritingProfile[]>(() => {
+    try {
+      const saved = localStorage.getItem("law_ocr_handwriting_profiles_v1");
+      return saved ? JSON.parse(saved) : INITIAL_HANDWRITING_PROFILES;
+    } catch {
+      return INITIAL_HANDWRITING_PROFILES;
+    }
+  });
+  const [activeHandwritingProfileId, setActiveHandwritingProfileId] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem("law_ocr_active_profile_id");
+      return saved || "hw-prof-lawyer-wesam";
+    } catch {
+      return "hw-prof-lawyer-wesam";
+    }
+  });
+  const [showHandwritingTrainingModal, setShowHandwritingTrainingModal] = useState(false);
+  const [trainingActiveTab, setTrainingActiveTab] = useState<"profiles" | "new_sample" | "library">("new_sample");
+
+  // New Training Sample Form State
+  const [newSampleTitle, setNewSampleTitle] = useState("");
+  const [newSampleCategory, setNewSampleCategory] = useState<"pleadings" | "minutes" | "receipts" | "numbers_dates" | "judge_notes" | "signatures">("pleadings");
+  const [newSamplePenType, setNewSamplePenType] = useState<"fountain" | "ballpoint" | "gel" | "pencil">("fountain");
+  const [newSampleGroundTruth, setNewSampleGroundTruth] = useState("");
+  const [newSampleImageBase64, setNewSampleImageBase64] = useState<string | null>(null);
+  const [newSampleWriterName, setNewSampleWriterName] = useState("");
+  const [newSampleNotes, setNewSampleNotes] = useState("");
+  const [isCalibratingSample, setIsCalibratingSample] = useState(false);
+  const [calibrationFeedbackReport, setCalibrationFeedbackReport] = useState<any>(null);
+  const trainingSampleFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Save handwriting profiles to localStorage
+  const saveHandwritingProfiles = (updatedProfiles: HandwritingProfile[]) => {
+    setHandwritingProfiles(updatedProfiles);
+    try {
+      localStorage.setItem("law_ocr_handwriting_profiles_v1", JSON.stringify(updatedProfiles));
+    } catch (e) {
+      console.error("Failed to save handwriting profiles:", e);
+    }
+  };
+
+  const activeHandwritingProfile = handwritingProfiles.find((p) => p.id === activeHandwritingProfileId) || handwritingProfiles[0];
   const [draftingMode, setDraftingMode] = useState<"raw" | "brief" | "summary">("raw");
   const [aiDraftedText, setAiDraftedText] = useState("");
   const [isAiDrafting, setIsAiDrafting] = useState(false);
@@ -179,6 +391,38 @@ export default function SmartOcrStudio({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Update match count when search query changes
+  useEffect(() => {
+    try {
+      const pending = localStorage.getItem("law_ocr_pending_scan");
+      if (pending) {
+        const parsed = JSON.parse(pending);
+        if (parsed && parsed.base64 && parsed.name) {
+          const itemId = "scan-" + Math.random().toString(36).substring(2, 9);
+          const newItem = {
+            id: itemId,
+            name: parsed.name,
+            previewUrl: parsed.base64,
+            base64: parsed.base64,
+            size: 1024 * 120,
+            isProcessing: false,
+            filter: "normal" as const
+          };
+          setScanItems(prev => [...prev, newItem]);
+          setActiveItemId(itemId);
+          localStorage.removeItem("law_ocr_pending_scan");
+          setAutoTriggerOcr(true);
+        }
+      }
+    } catch(e) {}
+  }, []);
+
+  useEffect(() => {
+    if (autoTriggerOcr && scanItems.length > 0) {
+      handleBatchOcr();
+      setAutoTriggerOcr(false);
+    }
+  }, [autoTriggerOcr, scanItems]);
+
   useEffect(() => {
     const text = aiDraftedText || extractedOverallText;
     if (!searchQuery.trim() || !text) {
@@ -718,7 +962,11 @@ ${textToParse}`
         const res = await fetch("/api/ai/ocr-extract-id-card", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ imageBase64: item.base64 })
+          body: JSON.stringify({ 
+            imageBase64: item.base64,
+            model: ocrModel,
+            useSearchGrounding: ocrUseSearchGrounding
+          })
         });
         if (res.ok) {
           const data = await res.json();
@@ -743,7 +991,11 @@ ${textToParse}`
         const res = await fetch("/api/ai/ocr-contract-memo", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ imageBase64: item.base64 })
+          body: JSON.stringify({ 
+            imageBase64: item.base64,
+            model: ocrModel,
+            useSearchGrounding: ocrUseSearchGrounding
+          })
         });
         if (res.ok) {
           const data = await res.json();
@@ -756,7 +1008,11 @@ ${textToParse}`
         const res = await fetch("/api/ai/ocr-court-session-ruling", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ imageBase64: item.base64 })
+          body: JSON.stringify({ 
+            imageBase64: item.base64,
+            model: ocrModel,
+            useSearchGrounding: ocrUseSearchGrounding
+          })
         });
         if (res.ok) {
           const data = await res.json();
@@ -769,7 +1025,17 @@ ${textToParse}`
         const res = await fetch("/api/ai/ocr-handwritten-draft", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ imageBase64: item.base64 })
+          body: JSON.stringify({ 
+            imageBase64: item.base64,
+            handwritingSubtype,
+            enhanceInk: true,
+            extractMarginalNotes: handwritingExtractMargins,
+            autoCorrectSpelling,
+            activeProfile: activeHandwritingProfile,
+            trainingSamples: activeHandwritingProfile?.samples || [],
+            model: ocrModel,
+            useSearchGrounding: ocrUseSearchGrounding
+          })
         });
         if (res.ok) {
           const data = await res.json();
@@ -777,13 +1043,49 @@ ${textToParse}`
         }
       }
 
-      // Default & other modes
+      // 5. Specialized Forensic Medical, Autopsy, Toxicology & DNA Analysis
+      if (ocrMode === "forensic_medical_dna") {
+        const res = await fetch("/api/ai/ocr-forensic-medical-dna", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imageBase64: item.base64,
+            model: ocrModel,
+            useSearchGrounding: ocrUseSearchGrounding
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          return data.text || "";
+        }
+      }
+
+      // 6. Specialized Stamp, Republic Eagle Seal & Signature Verification
+      if (ocrMode === "stamp_signature") {
+        const res = await fetch("/api/ai/ocr-stamp-signature-verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imageBase64: item.base64,
+            model: ocrModel,
+            useSearchGrounding: ocrUseSearchGrounding
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          return data.text || "";
+        }
+      }
+
+      // Default & other modes (tables, poa, standard)
       const res = await fetch("/api/ai/ocr", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           imageBase64: item.base64,
           mode: ocrMode,
+          model: ocrModel,
+          useSearchGrounding: ocrUseSearchGrounding,
           prompt: autoCorrectSpelling
             ? "قم بقراءة واستخراج كافة النصوص العربية المكتوبة في هذا المستند القضائي أو الورقة الرسمية بدقة متناهية من جميع الاتجاهات، مع تصحيح أي أخطاء إملائية أو مطبعية ناتجة عن رداءة التصوير أو الخط اليدوي، وترتيب الفقرات وتنسيق الجداول بدقة:"
             : undefined
@@ -824,6 +1126,41 @@ ${textToParse}`
     setScanItems(updatedItems);
     setExtractedOverallText(cleanCombined);
     setIsProcessingAll(false);
+
+    // Automatically record to OCR Processing History
+    updatedItems.forEach((item) => {
+      if (item.extractedText && item.extractedText.trim().length > 10) {
+        appendOcrHistory({
+          id: "hist-" + Math.random().toString(36).substring(2, 9),
+          fileName: item.name,
+          fileSize: `${Math.max(12, Math.round(item.size / 1024))} KB`,
+          fileType: item.name.toLowerCase().endsWith(".pdf") ? "pdf" : "image",
+          processedAt: new Date().toISOString(),
+          ocrMode: ocrMode,
+          ocrModeLabel: ocrMode === "national_id" 
+            ? "بطاقة رقم قومي" 
+            : ocrMode === "contract" 
+            ? "عقود وتوثيق" 
+            : ocrMode === "court_verdict" 
+            ? "أحكام ورول جلسات" 
+            : ocrMode === "handwritten" 
+            ? "خط يدوي ومسودات" 
+            : ocrMode === "forensic_medical_dna"
+            ? "طب شرعي وسموم وDNA"
+            : ocrMode === "stamp_signature"
+            ? "مضاهاة وتزييف وتزوير"
+            : ocrMode === "poa"
+            ? "توكيلات ومحررات"
+            : "مسح قضائي ذكي",
+          status: "completed",
+          accuracy: 98,
+          pageCount: 1,
+          extractedText: item.extractedText,
+          entities: detectedEntities,
+          previewUrl: item.previewUrl
+        });
+      }
+    });
 
     if (extractEntities && cleanCombined) {
       handleDeepEntityExtraction(cleanCombined);
@@ -1064,19 +1401,7 @@ ${textToParse}`
   return (
     <div className="space-y-6 font-sans text-right" dir="rtl">
       {/* 1. HEADER & SYSTEM TOOLBAR */}
-      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-wrap justify-between items-center gap-4">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 bg-amber-500/10 rounded-xl text-amber-500">
-            <Scan className="w-5 h-5" />
-          </div>
-          <h2 className="text-base md:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2 flex-wrap">
-            <span>استوديو المسح الضوئي والذكاء القضائي الشامل (Smart OCR+ Studio Pro)</span>
-            <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-mono">
-              FULL OCR SUITE
-            </span>
-          </h2>
-        </div>
-
+      <div className="bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-wrap justify-between items-center gap-3">
         {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-2">
           <input
@@ -1091,38 +1416,38 @@ ${textToParse}`
           {/* Camera Scanner Button */}
           <button
             onClick={() => setShowCameraModal(true)}
-            className="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-xs"
             title="التقاط فوري عبر كاميرا الموبايل أو اللابتوب"
           >
-            <Camera className="w-4 h-4" />
+            <Camera className="w-3.5 h-3.5" />
             <span>مسح بالكاميرا</span>
           </button>
 
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-xs"
           >
-            <Upload className="w-4 h-4" />
+            <Upload className="w-3.5 h-3.5" />
             <span>رفع ملفات</span>
           </button>
 
           {/* Google Drive Import Button */}
           <button
             onClick={handleOpenGoogleDriveModal}
-            className="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-xs"
             title="استيراد المستندات والقضايا مباشرة من Google Drive"
           >
-            <CloudDownload className="w-4 h-4" />
+            <CloudDownload className="w-3.5 h-3.5" />
             <span>Google Drive</span>
           </button>
 
           {/* Google Picker Button */}
           <button
             onClick={handleLaunchGooglePicker}
-            className="px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-amber-400 border border-amber-500/30 rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-md"
+            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-amber-400 border border-amber-500/30 rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-xs"
             title="اختيار تفاعلي ذكي للملفات عبر Google Picker"
           >
-            <FolderLock className="w-4 h-4" />
+            <FolderLock className="w-3.5 h-3.5" />
             <span>Picker</span>
           </button>
 
@@ -1130,10 +1455,10 @@ ${textToParse}`
             <button
               onClick={handleBatchOcr}
               disabled={isProcessingAll}
-              className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-md disabled:opacity-50"
+              className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
             >
-              <Sparkles className="w-4 h-4" />
-              <span>{isProcessingAll ? "جارٍ الفحص الشامل..." : "بدء الفحص واستخراج النصوص"}</span>
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>{isProcessingAll ? "جارٍ الفحص..." : "بدء الفحص واستخراج النصوص"}</span>
             </button>
           )}
         </div>
@@ -1151,6 +1476,65 @@ ${textToParse}`
         >
           <Scan className="w-4 h-4" />
           <span>المسح الضوئي واستخراج النصوص (OCR Core)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("batch")}
+          className={`px-4 py-2.5 rounded-2xl text-xs font-black transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTab === "batch"
+              ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md"
+              : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+          }`}
+        >
+          <Layers className="w-4 h-4" />
+          <span>طابور المعالجة المتتابع (Batch Process Queue)</span>
+        </button>
+
+        <button
+          onClick={() => {
+            if (!sideBySideDoc && scanItems.length > 0) {
+              const active = scanItems.find((s) => s.id === activeItemId) || scanItems[0];
+              setSideBySideDoc({
+                name: active.name,
+                imageSrc: active.previewUrl,
+                rawText: active.extractedText || extractedOverallText,
+                entities: active.entities || detectedEntities
+              });
+            }
+            setActiveTab("side_by_side");
+          }}
+          className={`px-4 py-2.5 rounded-2xl text-xs font-black transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTab === "side_by_side"
+              ? "bg-emerald-600 text-white shadow-md"
+              : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+          }`}
+        >
+          <Eye className="w-4 h-4" />
+          <span>المعاينة والتدقيق جنباً لجنب (Side-by-Side)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("multipage")}
+          className={`px-4 py-2.5 rounded-2xl text-xs font-black transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTab === "multipage"
+              ? "bg-indigo-600 text-white shadow-md"
+              : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+          }`}
+        >
+          <Split className="w-4 h-4" />
+          <span>تقسيم PDF متعدد القضايا (Multi-Page Splitter)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("history")}
+          className={`px-4 py-2.5 rounded-2xl text-xs font-black transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTab === "history"
+              ? "bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md"
+              : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+          }`}
+        >
+          <History className="w-4 h-4" />
+          <span>سجل المعالجات السابقة (Processing History)</span>
         </button>
 
         <button
@@ -1200,6 +1584,19 @@ ${textToParse}`
           <GitCompare className="w-4 h-4" />
           <span>مقارنة نسختين وتدقيق التعديلات (Diff)</span>
         </button>
+
+        <button
+          onClick={() => setActiveTab("science_forensic")}
+          className={`px-4 py-2.5 rounded-2xl text-xs font-black transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTab === "science_forensic"
+              ? "bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-md"
+              : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-teal-500/20"
+          }`}
+        >
+          <Microscope className="w-4 h-4 text-teal-500" />
+          <span>مختبر العلوم والطب الشرعي والسموم (Forensic & DNA Lab)</span>
+          <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
+        </button>
       </div>
 
       {/* 3. FEEDBACK ALERTS */}
@@ -1245,7 +1642,7 @@ ${textToParse}`
         <div className="space-y-6">
           {/* Settings Bar */}
           <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4 text-xs">
-            <div className="flex items-center gap-6 flex-wrap">
+            <div className="flex items-center gap-4 flex-wrap">
               <label className="flex items-center gap-2 cursor-pointer select-none font-bold text-slate-700 dark:text-slate-300">
                 <input
                   type="checkbox"
@@ -1253,7 +1650,7 @@ ${textToParse}`
                   onChange={(e) => setAutoCorrectSpelling(e.target.checked)}
                   className="w-4 h-4 accent-amber-500 rounded"
                 />
-                <span>التصحيح التلقائي للأخطاء الإملائية والمطبعية (AI Auto-Correct)</span>
+                <span>التصحيح التلقائي للأخطاء (Auto-Correct)</span>
               </label>
 
               <label className="flex items-center gap-2 cursor-pointer select-none font-bold text-slate-700 dark:text-slate-300">
@@ -1263,7 +1660,34 @@ ${textToParse}`
                   onChange={(e) => setExtractEntities(e.target.checked)}
                   className="w-4 h-4 accent-amber-500 rounded"
                 />
-                <span>الاستخراج التلقائي للأطراف والقضايا ومنع التكرار (Auto Link)</span>
+                <span>الربط بالأطراف والقضايا (Auto Link)</span>
+              </label>
+
+              {/* Gemini Model Selector */}
+              <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-2.5 py-1">
+                <Cpu className="w-3.5 h-3.5 text-amber-500" />
+                <span className="font-bold text-slate-600 dark:text-slate-400 text-[11px]">النموذج:</span>
+                <select
+                  value={ocrModel}
+                  onChange={(e: any) => setOcrModel(e.target.value)}
+                  className="bg-transparent text-[11px] font-mono font-bold text-slate-800 dark:text-slate-200 outline-none"
+                >
+                  <option value="gemini-3.8-flash">gemini-3.8-flash (الأشمل)</option>
+                  <option value="gemini-4-argon">gemini-4-argon (تأصيل واستدلال عميق)</option>
+                  <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite (فائق السرعة)</option>
+                </select>
+              </div>
+
+              {/* Google Search Grounding */}
+              <label className="flex items-center gap-1.5 cursor-pointer select-none font-bold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-2.5 py-1 text-[11px]">
+                <input
+                  type="checkbox"
+                  checked={ocrUseSearchGrounding}
+                  onChange={(e) => setOcrUseSearchGrounding(e.target.checked)}
+                  className="w-3.5 h-3.5 accent-amber-500 rounded"
+                />
+                <Globe className="w-3.5 h-3.5 text-sky-500" />
+                <span>بحث وتحقق جوجل الحي (Search Grounding 2026)</span>
               </label>
 
               <div className="flex items-center gap-2">
@@ -1277,6 +1701,8 @@ ${textToParse}`
                   <option value="contract">📜 2. العقود والمذكرات القانونية (أرشفة المستندات)</option>
                   <option value="court_verdict">⚖️ 3. محاضر الجلسات وأحكام المحاكم (أتمتة القضايا)</option>
                   <option value="handwritten">✍️ 4. النصوص والمسودات المكتوبة بخط اليد (تصحيح وتفريغ)</option>
+                  <option value="forensic_medical_dna">🧬 5. تقارير الطب الشرعي والسموم والبصمة الوراثية (DNA)</option>
+                  <option value="stamp_signature">🔍 6. أبحاث التزييف والتزوير ومضاهاة الأختام والتوقيعات</option>
                   <option value="standard">📄 استخراج نصوص قياسي شامل</option>
                   <option value="tables">📊 استخراج الجداول والبيانات المالية والمحاسبية</option>
                   <option value="poa">🏛️ التوكيلات ومحررات الشهر العقاري</option>
@@ -1284,136 +1710,303 @@ ${textToParse}`
               </div>
             </div>
 
-            <div className="text-[11px] text-slate-500">
-              الملفات المستوردة: <span className="font-bold text-amber-500 font-mono">{scanItems.length}</span> ملف
+            <div className="flex items-center gap-3">
+              {(extractedOverallText || scanItems.length > 0) && (
+                <button
+                  onClick={() => setShowDocumentChatModal(true)}
+                  className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-amber-500" />
+                  <span>محاورة المستند بالذكاء الاصطناعي</span>
+                </button>
+              )}
+              <div className="text-[11px] text-slate-500">
+                الملفات: <span className="font-bold text-amber-500 font-mono">{scanItems.length}</span>
+              </div>
             </div>
           </div>
 
-          {/* 4 SPECIALIZED OCR QUICK ACTION WORKFLOWS */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          {/* 6 SPECIALIZED OCR QUICK ACTION WORKFLOWS */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
             {/* Workflow 1: National ID */}
             <div 
               onClick={() => setOcrMode("national_id")}
-              className={`p-3.5 rounded-2xl border transition cursor-pointer text-right space-y-1.5 relative ${
+              className={`p-3 rounded-2xl border transition cursor-pointer text-right space-y-1 relative ${
                 ocrMode === "national_id" 
                   ? "bg-amber-500/10 border-amber-500 shadow-sm ring-1 ring-amber-500/50" 
                   : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-amber-400/50"
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300">
-                  النمط 1 • للعملاء الجدد
+                <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300">
+                  نمط 1 • عملاء
                 </span>
-                <UserPlus className={`w-4 h-4 ${ocrMode === "national_id" ? "text-amber-500" : "text-slate-400"}`} />
+                <UserPlus className={`w-3.5 h-3.5 ${ocrMode === "national_id" ? "text-amber-500" : "text-slate-400"}`} />
               </div>
               <h4 className="text-xs font-black text-slate-900 dark:text-slate-100">
                 1. بطاقة الرقم القومي
               </h4>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                استخراج الاسم الرباعي، الرقم القومي (14 رقماً)، العنوان بالتفصيل، والمهنة بتنسيق JSON.
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-snug">
+                استخراج الاسم، 14 رقم قومي، العنوان والمهنة JSON.
               </p>
             </div>
 
             {/* Workflow 2: Contracts & Memos */}
             <div 
               onClick={() => setOcrMode("contract")}
-              className={`p-3.5 rounded-2xl border transition cursor-pointer text-right space-y-1.5 relative ${
+              className={`p-3 rounded-2xl border transition cursor-pointer text-right space-y-1 relative ${
                 ocrMode === "contract" 
                   ? "bg-emerald-500/10 border-emerald-500 shadow-sm ring-1 ring-emerald-500/50" 
                   : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-emerald-400/50"
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
-                  النمط 2 • أرشفة المستندات
+                <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+                  نمط 2 • أرشفة
                 </span>
-                <FileCheck2 className={`w-4 h-4 ${ocrMode === "contract" ? "text-emerald-500" : "text-slate-400"}`} />
+                <FileCheck2 className={`w-3.5 h-3.5 ${ocrMode === "contract" ? "text-emerald-500" : "text-slate-400"}`} />
               </div>
               <h4 className="text-xs font-black text-slate-900 dark:text-slate-100">
-                2. العقود والمذكرات القانونية
+                2. العقود والمذكرات
               </h4>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                استخراج النص بدقة فائقة مع حفظ الترقيم، وتجاهل الأختام ووضع الكلمات غير الواضحة بين [غير مقروء].
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-snug">
+                استخراج النص وحفظ الترقيم والبنود بدقة عالية.
               </p>
             </div>
 
             {/* Workflow 3: Court Verdicts & Session Minutes */}
             <div 
               onClick={() => setOcrMode("court_verdict")}
-              className={`p-3.5 rounded-2xl border transition cursor-pointer text-right space-y-1.5 relative ${
+              className={`p-3 rounded-2xl border transition cursor-pointer text-right space-y-1 relative ${
                 ocrMode === "court_verdict" 
                   ? "bg-blue-500/10 border-blue-500 shadow-sm ring-1 ring-blue-500/50" 
                   : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-400/50"
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-700 dark:text-blue-300">
-                  النمط 3 • أتمتة القضايا
+                <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-700 dark:text-blue-300">
+                  نمط 3 • قضايا
                 </span>
-                <Scale className={`w-4 h-4 ${ocrMode === "court_verdict" ? "text-blue-500" : "text-slate-400"}`} />
+                <Scale className={`w-3.5 h-3.5 ${ocrMode === "court_verdict" ? "text-blue-500" : "text-slate-400"}`} />
               </div>
               <h4 className="text-xs font-black text-slate-900 dark:text-slate-100">
-                3. محاضر الجلسات والأحكام
+                3. الأحكام والجلسات
               </h4>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                تصنيف واستخراج رقم القضية وسنتها، نوع القضية ودرجة المحكمة، أطراف النزاع، ومنطوق الحكم.
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-snug">
+                رقم القضية، المحكمة، الأطراف، ومنطوق الحكم.
               </p>
             </div>
 
-            {/* Workflow 4: Handwritten Notes & Defense Drafts */}
+            {/* Workflow 4: Handwritten Notes */}
             <div 
               onClick={() => setOcrMode("handwritten")}
-              className={`p-3.5 rounded-2xl border transition cursor-pointer text-right space-y-1.5 relative ${
+              className={`p-3 rounded-2xl border transition cursor-pointer text-right space-y-1 relative ${
                 ocrMode === "handwritten" 
                   ? "bg-purple-500/10 border-purple-500 shadow-sm ring-1 ring-purple-500/50" 
                   : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-purple-400/50"
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-700 dark:text-purple-300">
-                  النمط 4 • مسودات خط اليد
+                <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-700 dark:text-purple-300">
+                  نمط 4 • خط اليد
                 </span>
-                <Edit3 className={`w-4 h-4 ${ocrMode === "handwritten" ? "text-purple-500" : "text-slate-400"}`} />
+                <Edit3 className={`w-3.5 h-3.5 ${ocrMode === "handwritten" ? "text-purple-500" : "text-slate-400"}`} />
               </div>
               <h4 className="text-xs font-black text-slate-900 dark:text-slate-100">
-                4. النصوص المكتوبة بخط اليد
+                4. مسودات خط اليد
               </h4>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                نسخ نصوص خط اليد وتصحيح الأخطاء الإملائية سياقياً مع تدوين الكلمة الأصلية في الملاحظات و[غير مقروء].
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-snug">
+                تفريغ الرقعة السريع وكتاب الجلسات والإيصالات.
+              </p>
+            </div>
+
+            {/* Workflow 5: Forensic Medicine, Autopsy, Toxicology & DNA */}
+            <div 
+              onClick={() => setOcrMode("forensic_medical_dna")}
+              className={`p-3 rounded-2xl border transition cursor-pointer text-right space-y-1 relative ${
+                ocrMode === "forensic_medical_dna" 
+                  ? "bg-teal-500/10 border-teal-500 shadow-sm ring-1 ring-teal-500/50" 
+                  : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-teal-400/50"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-700 dark:text-teal-300">
+                  نمط 5 • طب شرعي
+                </span>
+                <Dna className={`w-3.5 h-3.5 ${ocrMode === "forensic_medical_dna" ? "text-teal-500" : "text-slate-400"}`} />
+              </div>
+              <h4 className="text-xs font-black text-slate-900 dark:text-slate-100">
+                5. الطب الشرعي وDNA
+              </h4>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-snug">
+                الصفة التشريحية، السموم، علاقة السببية، وجداول المخدرات.
+              </p>
+            </div>
+
+            {/* Workflow 6: Stamp & Signature Verification */}
+            <div 
+              onClick={() => setOcrMode("stamp_signature")}
+              className={`p-3 rounded-2xl border transition cursor-pointer text-right space-y-1 relative ${
+                ocrMode === "stamp_signature" 
+                  ? "bg-rose-500/10 border-rose-500 shadow-sm ring-1 ring-rose-500/50" 
+                  : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-rose-400/50"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-700 dark:text-rose-300">
+                  نمط 6 • تزييف وتزوير
+                </span>
+                <Stamp className={`w-3.5 h-3.5 ${ocrMode === "stamp_signature" ? "text-rose-500" : "text-slate-400"}`} />
+              </div>
+              <h4 className="text-xs font-black text-slate-900 dark:text-slate-100">
+                6. الأختام والتوقيعات
+              </h4>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-snug">
+                مضاهاة التوقيعات، نسر الجمهورية، وطعون التزوير (م 44).
               </p>
             </div>
           </div>
+
+          {/* Dedicated Handwriting OCR Intelligence Configuration Bar */}
+          {ocrMode === "handwritten" && (
+            <div className="bg-gradient-to-r from-purple-900/20 via-purple-800/10 to-indigo-900/20 border border-purple-500/30 rounded-2xl p-4 space-y-3 animate-fadeIn">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-purple-500/20 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2.5 bg-purple-500/20 text-purple-400 rounded-xl">
+                    <Edit3 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-black text-slate-900 dark:text-purple-100 flex items-center gap-2">
+                      <span>محرك الذكاء الاصطناعي لفك وتفريغ خطوط اليد العربية (Arabic Cursive OCR Engine)</span>
+                      <span className="text-[10px] bg-purple-500/20 text-purple-700 dark:text-purple-300 font-bold px-2 py-0.5 rounded-md border border-purple-500/30">
+                        {activeHandwritingProfile?.name ? `نمط: ${activeHandwritingProfile.name}` : "النمط الافتراضي"}
+                      </span>
+                    </h5>
+                    <p className="text-[11px] text-slate-500 dark:text-purple-300/70 mt-0.5">
+                      تم تحسين المحرك لفك خطوط الرقعة والنسخ السريع، خطوط كتاب الجلسات، إيصالات الأمانة، وتأشيرات القضاة بنماذج تدريبية مخصصة.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {/* Handwriting Trainer Trigger Button */}
+                  <button
+                    id="open-handwriting-trainer-btn"
+                    type="button"
+                    onClick={() => setShowHandwritingTrainingModal(true)}
+                    className="px-3.5 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-black flex items-center gap-2 shadow-sm border border-purple-400/40 cursor-pointer transition"
+                  >
+                    <GraduationCap className="w-4 h-4 text-purple-200" />
+                    <span>تدريب ومعايرة خط اليد (AI Trainer)</span>
+                    <span className="bg-purple-950/60 text-purple-200 text-[10px] font-mono px-1.5 py-0.5 rounded-md">
+                      {activeHandwritingProfile?.samples?.length || 0} عينات
+                    </span>
+                  </button>
+
+                  <span className="text-[10px] bg-purple-500/20 text-purple-700 dark:text-purple-300 font-black px-2.5 py-1 rounded-full border border-purple-500/40 shrink-0">
+                    Gemini 3.7 Flash • Handwriting Edition
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-700 dark:text-slate-300">نمط الخط المدرب:</span>
+                    <select
+                      value={activeHandwritingProfileId}
+                      onChange={(e) => {
+                        setActiveHandwritingProfileId(e.target.value);
+                        localStorage.setItem("law_ocr_active_profile_id", e.target.value);
+                      }}
+                      className="bg-white dark:bg-slate-900 border border-purple-500/40 rounded-xl px-3 py-1.5 text-xs font-bold text-purple-900 dark:text-purple-200 outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+                      {handwritingProfiles.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          ✍️ {p.name} ({p.samples.length} عينة - دقة {p.accuracyScore || 98}%)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-700 dark:text-slate-300">نوع المحرر اليدوي:</span>
+                    <select
+                      value={handwritingSubtype}
+                      onChange={(e: any) => setHandwritingSubtype(e.target.value)}
+                      className="bg-white dark:bg-slate-900 border border-purple-500/40 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 dark:text-purple-200 outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="general">📝 نصوص ومسودات حرة عامة</option>
+                      <option value="court_minutes">⚖️ محاضر جلسات المحاكم ورول القضاة</option>
+                      <option value="promissory_receipt">💵 إيصالات أمانة وشيكات وتفقيط مالي</option>
+                      <option value="judge_endorsement">🏛️ تأشيرات وهوامش القضاة والنيابة</option>
+                      <option value="police_report">👮 محاضر جمع الاستدلالات وأقوال الشهود</option>
+                      <option value="defense_draft">📜 مسودات مذكرات الدفاع ودفوع المحامين</option>
+                      <option value="customary_contract">📑 عقود وتنازلات عرفية مكتوبة باليد</option>
+                      <option value="expert_report">📐 تقارير الخبراء الميدانيين والمحاسبيين</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="flex items-center gap-2 cursor-pointer select-none font-bold text-slate-700 dark:text-slate-300 bg-white/50 dark:bg-slate-900/50 px-3 py-1.5 rounded-xl border border-purple-500/20 hover:border-purple-500/40">
+                    <input
+                      type="checkbox"
+                      checked={handwritingExtractMargins}
+                      onChange={(e) => setHandwritingExtractMargins(e.target.checked)}
+                      className="w-4 h-4 accent-purple-500 rounded"
+                    />
+                    <span>استخراج التأشيرات والهوامش الجانبية</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer select-none font-bold text-slate-700 dark:text-slate-300 bg-white/50 dark:bg-slate-900/50 px-3 py-1.5 rounded-xl border border-purple-500/20 hover:border-purple-500/40">
+                    <input
+                      type="checkbox"
+                      checked={autoCorrectSpelling}
+                      onChange={(e) => setAutoCorrectSpelling(e.target.checked)}
+                      className="w-4 h-4 accent-purple-500 rounded"
+                    />
+                    <span>التصحيح السياقي لسرعة اليد</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Main Grid or Empty Dropzone */}
           {scanItems.length === 0 ? (
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-amber-500 rounded-3xl p-12 text-center bg-white dark:bg-slate-900 cursor-pointer transition space-y-4"
+              className="border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-amber-500/50 rounded-2xl p-8 text-center bg-white dark:bg-slate-900/60 cursor-pointer transition space-y-3"
             >
-              <div className="w-16 h-16 bg-amber-500/10 text-amber-500 rounded-2xl flex items-center justify-center mx-auto">
-                <ImageIcon className="w-8 h-8" />
+              <div className="w-12 h-12 bg-amber-500/10 text-amber-500 rounded-xl flex items-center justify-center mx-auto">
+                <ImageIcon className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-base font-black text-slate-800 dark:text-slate-200">
-                  اسحب وأفلت صور المستندات القضائية أو اضغط للاستيراد
+                <h3 className="text-sm font-black text-slate-800 dark:text-slate-200">
+                  اسحب وأفلت المستندات أو اضغط للاستيراد
                 </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  يدعم رفع عدة صور دفعة واحدة أو التقاط صور مباشرة بالكاميرا للعرائض، الأحكام، التوكيلات، والإيصالات
+                <p className="text-xs text-slate-400 mt-0.5">
+                  يدعم صور المستندات القضائية وملفات PDF، أو التصوير المباشر بالكاميرا
                 </p>
               </div>
-              <div className="flex items-center justify-center gap-3 pt-2">
+              <div className="flex items-center justify-center gap-2 pt-1">
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     setShowCameraModal(true);
                   }}
-                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-black transition flex items-center gap-1.5"
+                  className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-black transition flex items-center gap-1 cursor-pointer"
                 >
-                  <Camera className="w-4 h-4" />
-                  <span>فتح الكاميرا والمسح المباشر</span>
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>المسح بالكاميرا</span>
                 </button>
-                <button className="px-5 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-black transition">
-                  اختيار الملفات من الجهاز
+                <button 
+                  type="button"
+                  className="px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition cursor-pointer"
+                >
+                  اختيار من الجهاز
                 </button>
               </div>
             </div>
@@ -1717,6 +2310,25 @@ ${textToParse}`
                       <span>تلخيص الوقائع</span>
                     </button>
 
+                    {/* Side-by-Side Interactive Corrector */}
+                    <button
+                      onClick={() => {
+                        const active = scanItems.find((s) => s.id === activeItemId) || scanItems[0];
+                        setSideBySideDoc({
+                          name: active?.name || "المستند_المفحوص.jpg",
+                          imageSrc: active?.previewUrl || "",
+                          rawText: aiDraftedText || extractedOverallText,
+                          entities: active?.entities || detectedEntities
+                        });
+                        setActiveTab("side_by_side");
+                      }}
+                      className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-black transition flex items-center gap-1 cursor-pointer shadow-xs"
+                      title="فتح نافذة التدقيق البصري جنباً إلى جنب مع المستند الأصلي"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>تدقيق جنباً لجنب</span>
+                    </button>
+
                     <button
                       onClick={() => handleDeepEntityExtraction(extractedOverallText)}
                       disabled={!extractedOverallText || isParsingEntities}
@@ -1768,6 +2380,27 @@ ${textToParse}`
                     >
                       <Download className="w-3.5 h-3.5" />
                       <span>تحميل TXT</span>
+                    </button>
+
+                    {/* Send directly to Paginated A4 Editor */}
+                    <button
+                      onClick={() => {
+                        const textToTransfer = aiDraftedText || extractedOverallText;
+                        if (!textToTransfer.trim()) {
+                          alert("الرجاء استخراج النص أولاً لنقله إلى محرر المستندات.");
+                          return;
+                        }
+                        const title = detectedEntities.subject || (detectedEntities.caseNumber ? `مستند قضية ${detectedEntities.caseNumber}/${detectedEntities.caseYear}` : "محرر مستند A4 جديد");
+                        if (onOpenInEditor) {
+                          onOpenInEditor(textToTransfer, title, detectedEntities.clientName, detectedEntities.caseNumber);
+                        }
+                      }}
+                      disabled={!extractedOverallText && !aiDraftedText}
+                      className="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-md disabled:opacity-50 active:scale-95"
+                      title="فتح النص المستخرج في محرر صفحات A4 الذكي المقسم تلقائياً"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-slate-950" />
+                      <span>فتح في محرر صفحات A4 الذكي 📄</span>
                     </button>
                   </div>
 
@@ -2007,6 +2640,101 @@ ${textToParse}`
         </div>
       )}
 
+      {/* TAB: BATCH PROCESS QUEUE */}
+      {activeTab === "batch" && (
+        <OcrBatchQueue
+          currentUser={currentUser}
+          clients={clients}
+          cases={cases}
+          opponents={opponents}
+          onAddClient={onAddClient}
+          onAddCase={onAddCase}
+          onAddOpponent={onAddOpponent}
+          onOpenInEditor={onOpenInEditor}
+          onNavigate={onNavigate}
+          language={language}
+          onOpenSideBySide={(item) => {
+            setSideBySideDoc({
+              name: item.name,
+              imageSrc: item.previewUrl,
+              rawText: item.extractedText || "",
+              entities: {
+                clientName: item.entities?.clientName || "",
+                nationalId: item.entities?.nationalId || "",
+                opponentName: item.entities?.opponentName || "",
+                caseNumber: item.entities?.caseNumber || "",
+                caseYear: item.entities?.caseYear || "",
+                competentCourt: item.entities?.competentCourt || "",
+                courtType: item.entities?.courtType || "",
+                subject: item.entities?.subject || "",
+                demands: item.entities?.demands || ""
+              }
+            });
+            setActiveTab("side_by_side");
+          }}
+        />
+      )}
+
+      {/* TAB: SIDE-BY-SIDE INTERACTIVE OCR CORRECTION */}
+      {activeTab === "side_by_side" && (
+        <OcrSideBySideCorrector
+          documentName={sideBySideDoc?.name || (scanItems[0]?.name ?? "مستند_قضائي.jpg")}
+          imageSrc={sideBySideDoc?.imageSrc || scanItems[0]?.previewUrl || ""}
+          rawExtractedText={sideBySideDoc?.rawText || extractedOverallText || ""}
+          initialEntities={sideBySideDoc?.entities || detectedEntities}
+          currentUser={currentUser}
+          clients={clients}
+          cases={cases}
+          opponents={opponents}
+          onAddClient={onAddClient}
+          onAddCase={onAddCase}
+          onAddOpponent={onAddOpponent}
+          onOpenInEditor={onOpenInEditor}
+          onBack={() => setActiveTab("ocr")}
+          onSaveCorrections={(correctedEntities, correctedText) => {
+            setDetectedEntities((prev) => ({ ...prev, ...correctedEntities }));
+            setExtractedOverallText(correctedText);
+          }}
+          language={language}
+        />
+      )}
+
+      {/* TAB: MULTI-PAGE CASE SPLITTER & BULK EXTRACTOR */}
+      {activeTab === "multipage" && (
+        <OcrMultiPageCaseSplitter
+          currentUser={currentUser}
+          clients={clients}
+          cases={cases}
+          opponents={opponents}
+          onAddClient={onAddClient}
+          onAddCase={onAddCase}
+          onAddOpponent={onAddOpponent}
+          onOpenInEditor={onOpenInEditor}
+          onNavigate={onNavigate}
+          language={language}
+        />
+      )}
+
+      {/* TAB: PROCESSING HISTORY (سجل المعالجات السابقة) */}
+      {activeTab === "history" && (
+        <OcrProcessingHistory
+          currentUser={currentUser}
+          clients={clients}
+          cases={cases}
+          opponents={opponents}
+          onAddClient={onAddClient || (() => {})}
+          onAddCase={onAddCase || (() => {})}
+          onAddOpponent={onAddOpponent}
+          onOpenInEditor={(txt, title) => onOpenInEditor?.(txt, title, detectedEntities.clientName, detectedEntities.caseNumber)}
+          onNavigate={onNavigate}
+          onOpenSideBySide={(doc) => {
+            setSideBySideDoc(doc);
+            setActiveTab("side_by_side");
+          }}
+          language={language}
+        />
+      )}
+
       {/* TAB 2: LEGAL FLAWS & DEFENSE INTELLIGENCE */}
       {activeTab === "flaws" && (
         <OcrLegalFlawsAnalysis
@@ -2038,6 +2766,22 @@ ${textToParse}`
           onOpenInEditor={(txt, title) => onOpenInEditor?.(txt, title, detectedEntities.clientName, detectedEntities.caseNumber)}
         />
       )}
+
+      {/* TAB 6: FORENSIC SCIENCE & BIOSCIENCE EVIDENCE LAB */}
+      {activeTab === "science_forensic" && (
+        <OcrForensicScienceLab
+          initialDocumentText={aiDraftedText || extractedOverallText}
+          onInsertToEditor={(txt) => onOpenInEditor?.(txt, "تقرير الأدلة الطبية الشرعية والسموم", detectedEntities.clientName, detectedEntities.caseNumber)}
+        />
+      )}
+
+      {/* OCR DOCUMENT CHAT ASSISTANT MODAL */}
+      <OcrDocumentChatAssistant
+        isOpen={showDocumentChatModal}
+        onClose={() => setShowDocumentChatModal(false)}
+        documentText={aiDraftedText || extractedOverallText}
+        documentTitle={activeItem?.name || detectedEntities.subject || "المستند القضائي المستخرج"}
+      />
 
       {/* CAMERA SCANNER MODAL */}
       <OcrCameraScannerModal

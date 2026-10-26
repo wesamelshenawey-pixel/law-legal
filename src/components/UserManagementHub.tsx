@@ -6,6 +6,7 @@ import {
   SecurityAuditLog 
 } from "../types";
 import { ROLE_LABELS } from "../utils/rbacAndSecurity";
+import { SectionDedicatedOcrModal } from "./SectionDedicatedOcrModal";
 import { 
   Users, 
   UserPlus, 
@@ -26,7 +27,8 @@ import {
   Layers,
   ArrowRightLeft,
   Mail,
-  Phone
+  Phone,
+  Scan
 } from "lucide-react";
 
 interface UserManagementHubProps {
@@ -71,6 +73,7 @@ export default function UserManagementHub({
   // Password Reset Modal State
   const [resetModalUserId, setResetModalUserId] = useState<string | null>(null);
   const [newPasswordVal, setNewPasswordVal] = useState("");
+  const [isNationalIdOcrOpen, setIsNationalIdOcrOpen] = useState(false);
 
   // Merge Accounts Modal State
   const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
@@ -308,6 +311,17 @@ export default function UserManagementHub({
               <span>سجل التدقيق الأمني ({auditLogs.length})</span>
             </button>
           </div>
+
+          <button
+            onClick={() => {
+              setIsNationalIdOcrOpen(true);
+            }}
+            className="px-3.5 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-900 dark:text-amber-300 border border-amber-500/40 font-black text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition cursor-pointer active:scale-95"
+            title="مسح بطاقة الرقم القومي أو الهوية عبر سكانر Lexmark X54de أو OCR"
+          >
+            <Scan className="w-4 h-4 text-amber-500" />
+            <span>ماسح Lexmark X54de / بطاقة الهوية</span>
+          </button>
 
           <button
             onClick={handleOpenAddUser}
@@ -872,6 +886,19 @@ export default function UserManagementHub({
           </div>
         </div>
       )}
+
+      {/* Dedicated Section OCR Modal for User Management & National ID Cards */}
+      <SectionDedicatedOcrModal
+        isOpen={isNationalIdOcrOpen}
+        onClose={() => setIsNationalIdOcrOpen(false)}
+        section="user_management"
+        language={language}
+        onApplyData={(res) => {
+          if (res.userName) setFormName(res.userName);
+          if (res.nationalId) setFormPhone("01" + res.nationalId.slice(0, 9)); // Smart phone or preset
+          setIsUserModalOpen(true);
+        }}
+      />
 
     </div>
   );

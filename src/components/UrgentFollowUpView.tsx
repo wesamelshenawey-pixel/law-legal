@@ -363,16 +363,12 @@ export default function UrgentFollowUpView({
   return (
     <div className="space-y-6 text-right font-sans" dir="rtl">
       
-      {/* 1. Header Toolbar with Extracted Buttons */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 bg-amber-500/10 rounded-xl text-amber-500">
-            <Flame className="w-5 h-5 animate-pulse" />
-          </div>
-          <div>
-            <h1 className="text-base md:text-lg font-black text-slate-900 dark:text-white">
-              لوحة متابعة الموكلين والمستخدمين (الحالات العاجلة)
-            </h1>
+      {/* 1. Header Toolbar with Action Buttons */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+        <div className="flex items-center gap-2">
+          <div className="p-2 bg-amber-500/10 rounded-xl text-amber-500 flex items-center gap-2 text-xs font-black">
+            <Flame className="w-4 h-4 animate-pulse text-amber-500" />
+            <span>الحالات العاجلة</span>
           </div>
         </div>
 

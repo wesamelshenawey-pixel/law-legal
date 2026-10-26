@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
 import JSZip from "jszip";
+import QRCode from "react-qr-code";
 import {
   UploadCloud,
   FileArchive,
@@ -891,8 +892,14 @@ export default function DocumentManagerModal({
           <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-sm flex flex-col items-center gap-4 animate-in zoom-in-95">
             <h3 className="font-bold text-slate-900 dark:text-white">QR Code - مشاركة المستند</h3>
             <p className="text-xs text-slate-500 text-center">امسح الكود لفتح المستند على الهاتف الذكي</p>
-            <div className="bg-white p-2 rounded-xl shadow-inner border border-slate-200">
-              <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://law-app.local/doc/${showQrForDoc}`} alt="QR Code" className="w-48 h-48" />
+            <div className="bg-white p-4 rounded-xl shadow-inner border border-slate-200 flex justify-center items-center">
+              <QRCode 
+                value={`https://${window.location.host}/doc/${showQrForDoc}`} 
+                size={180}
+                level="M"
+                bgColor="#ffffff"
+                fgColor="#0f172a"
+              />
             </div>
             <button
               onClick={() => setShowQrForDoc(null)}

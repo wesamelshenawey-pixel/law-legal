@@ -26,6 +26,7 @@ export interface SignatureHistoryEntry {
 }
 
 export interface GoogleKeepNote {
+  kanbanStatus?: "pending" | "in_progress" | "archived";
   id: string;
   title: string;
   content: string;
