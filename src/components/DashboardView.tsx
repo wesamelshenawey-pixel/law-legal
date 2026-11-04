@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { CaseRecord, ClientProfile, SessionRecord, LeadProfile, PlatformUser, FeeTransfer, ClientNote, NoteSignatureData, UserRole } from "../types";
+import { isOwnerPhone } from "../utils/ownerAccount";
 import { 
   Users, 
   Briefcase, 
@@ -57,6 +58,7 @@ import {
   ShieldAlert,
   Map,
   MapPin,
+  ClipboardList,
   PieChart as PieChartIcon
 } from "lucide-react";
 import LawyerSignatureSeal from "./LawyerSignatureSeal";
@@ -979,7 +981,7 @@ export default function DashboardView({
   const isManager = Boolean(
     currentUser?.role === UserRole.ADMIN ||
 
-    currentUser?.phone === "01283233555" ||
+    isOwnerPhone(currentUser?.phone) ||
     currentUser?.permissions?.canManageUsers ||
     currentUser?.permissions?.canManageDevices ||
     !currentUser
@@ -4008,7 +4010,7 @@ ${confLink}
                 <div className="space-y-3 font-mono text-xs">
                   <div className="p-3 bg-slate-950 text-emerald-400 rounded-xl max-h-52 overflow-y-auto space-y-1 text-right" dir="ltr">
                     <p className="text-slate-400">[{new Date().toLocaleTimeString()}] System Security Audit Log Initiated</p>
-                    <p className="text-emerald-400">[200 OK] Admin authorized via secure session for wesam.elshenawey@gmail.com</p>
+                    <p className="text-emerald-400">[200 OK] Admin authorized via secure session</p>
                     <p className="text-blue-400">[SYNC] Hybrid Firebase sync confirmed (collections: cases, sessions, clients)</p>
                     <p className="text-amber-400">[DEVICE] LAN Scanner connected at 192.168.1.104</p>
                     <p className="text-emerald-400">[OCR] Gemini 3.7 Flash Handwriting Engine loaded successfully</p>

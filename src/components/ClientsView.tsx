@@ -877,7 +877,6 @@ export default function ClientsView({
                   <h4 className="text-sm font-bold text-slate-900">{user.name}</h4>
                   <div className="space-y-1.5 text-xs text-slate-600 border-t border-slate-200 pt-2 grid grid-cols-2 gap-2 font-sans">
                     <p><span className="text-slate-400">الهاتف:</span> <span className="text-slate-900 font-mono font-bold">{user.phone}</span></p>
-                    <p><span className="text-slate-400">كلمة المرور:</span> <span className="text-amber-800 font-mono bg-amber-50 px-1 border border-amber-100 rounded">{user.passwordHash}</span></p>
                     <p className="col-span-2 text-[11px] text-amber-700 font-bold font-sans">المزامنات والربط:</p>
                     <p className="text-[11px] text-slate-500 truncate">جوجل: {user.googleAccount || "غير مربوط"}</p>
                     <p className="text-[11px] text-slate-500 truncate">فيسبوك: {user.facebookAccount || "غير مربوط"}</p>
@@ -1138,7 +1137,6 @@ export default function ClientsView({
                       <th className="pb-2 text-right">رقم الهاتف</th>
                       <th className="pb-2 text-right">الصلاحية الدائرية</th>
                       <th className="pb-2 text-right">البلد / هجين</th>
-                      <th className="pb-2 text-left">كلمة المرور</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1153,7 +1151,6 @@ export default function ClientsView({
                           {u.role === UserRole.SEEKER && <span className="text-purple-600">طالب خدمة</span>}
                         </td>
                         <td className="py-3 text-slate-500">{u.isVerified ? "مؤكد مصري" : "دولي"}</td>
-                        <td className="py-3 text-left font-mono font-bold text-slate-900 pr-2">{u.passwordHash}</td>
                       </tr>
                     ))}
                   </tbody>

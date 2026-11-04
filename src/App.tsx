@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { jsPDF } from "jspdf";
 import { Analytics } from "@vercel/analytics/react";
+import { isOwnerPhone, OWNER_NAME, OWNER_PASSWORD, OWNER_PHONES } from "./utils/ownerAccount";
 import { 
   UserRole, 
   PlatformUser, 
@@ -262,13 +263,21 @@ export default function App() {
 
   const [registeredUsers, setRegisteredUsers] = useState<PlatformUser[]>(() => {
     const saved = localStorage.getItem("law_users");
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      const users: PlatformUser[] = JSON.parse(saved);
+      // Keep the owner master account in sync with the configured credentials.
+      return users.map((u) =>
+        u.id === "usr-admin"
+          ? { ...u, name: OWNER_NAME, phone: OWNER_PHONES[0], passwordHash: OWNER_PASSWORD }
+          : u
+      );
+    }
     return [
       {
         id: "usr-admin",
-        name: "الأستاذ وسام حمدي الشناوي",
-        phone: "01283233555",
-        passwordHash: "W-001*001",
+        name: OWNER_NAME,
+        phone: OWNER_PHONES[0],
+        passwordHash: OWNER_PASSWORD,
         role: UserRole.ADMIN,
         isVerified: true,
         createdAt: new Date().toISOString()
@@ -823,7 +832,7 @@ export default function App() {
   // ----------------------------------------------------
   const isCopyLicensedOnThisDevice = () => {
     // Wesam Al-Shenawey master administrator bypasses all device locks
-    if (currentUser?.phone === "01283233555") return true;
+    if (isOwnerPhone(currentUser?.phone)) return true;
 
     const matchedLic = licenses.find(l => l.id === activeLicenseKey);
     if (matchedLic && matchedLic.status === "active") {
@@ -2039,7 +2048,7 @@ export default function App() {
   }
 
   // 2. IF LOGGED IN BUT MACHINE IS UNLICENSED, REQUIRE ACTIVATION (Bypassed if user phone is general Admin Wesam)
-  const isMasterAdmin = currentUser.phone === "01283233555";
+  const isMasterAdmin = isOwnerPhone(currentUser.phone);
   if (!isCopyLicensedOnThisDevice() && !isMasterAdmin) {
     return (
       <LicensingGate
