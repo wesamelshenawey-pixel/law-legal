@@ -4,3 +4,5 @@ coverage/
 *.log
 .env*
 !.env.example
+
+!.env.base44-defaults

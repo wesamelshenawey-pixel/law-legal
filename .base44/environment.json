@@ -1,0 +1,12 @@
+{
+  "previewPort": 3000,
+  "healthPath": "/",
+  "startCommand": "docker compose -f docker-compose.base44.yml up -d",
+  "secrets": [
+    {
+      "name": "GEMINI_API_KEY",
+      "description": "Google Gemini API key for the AI legal assistant (Google AI Studio → Get API key). Optional for boot: the server falls back to a placeholder and AI endpoints fail gracefully without it.",
+      "requiredAtBoot": false
+    }
+  ]
+}
