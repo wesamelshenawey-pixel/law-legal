@@ -1,0 +1,12 @@
+{
+  "previewPort": 3000,
+  "healthPath": "/",
+  "startCommand": "docker compose -f docker-compose.base44.yml up -d",
+  "secrets": [
+    {
+      "name": "GEMINI_API_KEY",
+      "description": "Google Gemini API key used by the server-side AI routes in server.ts (create in Google AI Studio). Not required at boot: server.ts falls back to a dummy key, so only AI features fail without it.",
+      "requiredAtBoot": false
+    }
+  ]
+}
