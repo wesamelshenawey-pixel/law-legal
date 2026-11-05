@@ -20,8 +20,7 @@ export default function CompaniesView() {
         duration: "من 5 إلى 7 أيام عمل رسمية للهيئة العامة للاستثمار بمصر (GAFI)",
         totalPrice: ((parseFloat(capital) * 0.0035 + 6200)).toLocaleString("ar-EG") + " جنيه مصري"
       });
-      alert("قام مستشار الذكاء الاصطناعي بجرد الرسوم الحكومية ونقابة المحامين ورسوم التوثيق بهيئة الاستثمار لعام ٢٠٢٦ بدقة!");
-    }, 1200);
+    }, 800);
   };
 
   return (

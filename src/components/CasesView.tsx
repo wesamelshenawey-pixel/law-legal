@@ -35,13 +35,21 @@ import {
   Bookmark,
   Layers,
   Flag,
-  Share2
+  Share2,
+  Archive,
+  ArchiveRestore,
+  FolderArchive,
+  FolderOpen,
+  Lock,
+  DollarSign
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { dbSaveEmailNotification } from "../utils/firebaseSync";
 import { getClientRoleLabel } from "../utils/translations";
 import CaseTimeline from "./CaseTimeline";
 import { saveLocalKeepMemo, GoogleKeepNote } from "../utils/workspaceService";
+import { SectionDedicatedOcrModal } from "./SectionDedicatedOcrModal";
+import ClientFeeDetailsModal from "./ClientFeeDetailsModal";
 
 interface CasesViewProps {
   cases: CaseRecord[];
@@ -61,6 +69,7 @@ interface CasesViewProps {
   onClearDefaultSelectCaseId?: () => void;
   onOpenDocumentManager?: (section: string, label: string) => void;
   onNavigateToOcr?: () => void;
+  onOpenFeeDetails?: (client: ClientProfile, caseRecord?: CaseRecord) => void;
 }
 
 export function SessionCountdown({ targetDateStr, language }: { targetDateStr: string; language: "ar" | "en" }) {
@@ -167,18 +176,23 @@ export default function CasesView({
   defaultSelectCaseId,
   onClearDefaultSelectCaseId,
   onOpenDocumentManager,
-  onNavigateToOcr
+  onNavigateToOcr,
+  onOpenFeeDetails
 }: CasesViewProps) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedCaseIds, setSelectedCaseIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCase, setSelectedCase] = useState<CaseRecord | null>(null);
+  const [selectedCaseForFeeModal, setSelectedCaseForFeeModal] = useState<{ client: ClientProfile; caseRecord: CaseRecord } | null>(null);
+  const [casesTab, setCasesTab] = useState<"active" | "archived">("active");
+  const [archiveSearchMode, setArchiveSearchMode] = useState<"all" | "client" | "case_number">("all");
 
   // --- Case Filter Bar States ---
   const [courtFilter, setCourtFilter] = useState<string>("all");
   const [yearFilter, setYearFilter] = useState<string>("all");
   const [sessionStatusFilter, setSessionStatusFilter] = useState<string>("all");
   const [courtTypeFilter, setCourtTypeFilter] = useState<string>("all");
+  const [isCaseOcrOpen, setIsCaseOcrOpen] = useState(false);
 
   // --- Client Email Notification Modal States ---
   const [emailNoticeCase, setEmailNoticeCase] = useState<CaseRecord | null>(null);
@@ -922,26 +936,176 @@ export default function CasesView({
     (courtTypeFilter !== "all" ? 1 : 0) + 
     (searchQuery.trim() ? 1 : 0);
 
+  const isCaseArchived = (c: CaseRecord) => {
+    return c.status === "archived" || c.isArchived === true;
+  };
+
+  const totalActiveCount = useMemo(() => {
+    return cases.filter(c => !isCaseArchived(c)).length;
+  }, [cases]);
+
+  const totalArchivedCount = useMemo(() => {
+    return cases.filter(c => isCaseArchived(c)).length;
+  }, [cases]);
+
+  const archivedCasesList = useMemo(() => {
+    return cases.filter(c => isCaseArchived(c));
+  }, [cases]);
+
+  const archivedClients = useMemo(() => {
+    const list = archivedCasesList.map(c => c.clientName.trim()).filter(Boolean);
+    return Array.from(new Set(list));
+  }, [archivedCasesList]);
+
+  const archivedCaseNumbers = useMemo(() => {
+    const list = archivedCasesList.map(c => c.caseNumber.trim()).filter(Boolean);
+    return Array.from(new Set(list));
+  }, [archivedCasesList]);
+
+  const unarchivedClosedCases = useMemo(() => {
+    return cases.filter(c => c.stage === "closed" && !isCaseArchived(c));
+  }, [cases]);
+
+  const handleArchiveCase = (caseId: string, reason?: string) => {
+    if (onUpdateCase) {
+      onUpdateCase(caseId, {
+        status: "archived",
+        isArchived: true,
+        archivedAt: new Date().toISOString(),
+        archiveReason: reason || "أرشفة يدوية وحفظ الملف القضائي"
+      });
+    }
+    if (selectedCase?.id === caseId) {
+      setSelectedCase(prev => prev ? {
+        ...prev,
+        status: "archived",
+        isArchived: true,
+        archivedAt: new Date().toISOString(),
+        archiveReason: reason || "أرشفة يدوية وحفظ الملف القضائي"
+      } : null);
+    }
+  };
+
+  const handleRestoreCase = (caseId: string) => {
+    if (onUpdateCase) {
+      onUpdateCase(caseId, {
+        status: "active",
+        isArchived: false
+      });
+    }
+    if (selectedCase?.id === caseId) {
+      setSelectedCase(prev => prev ? {
+        ...prev,
+        status: "active",
+        isArchived: false
+      } : null);
+    }
+  };
+
+  const handleCloseAndArchiveCase = (caseId: string, reason?: string) => {
+    if (onUpdateCase) {
+      onUpdateCase(caseId, {
+        stage: "closed",
+        status: "archived",
+        isArchived: true,
+        archivedAt: new Date().toISOString(),
+        archiveReason: reason || "إغلاق الدعوى وصدور حكم نهائي"
+      });
+    }
+    if (selectedCase?.id === caseId) {
+      setSelectedCase(prev => prev ? {
+        ...prev,
+        stage: "closed",
+        status: "archived",
+        isArchived: true,
+        archivedAt: new Date().toISOString(),
+        archiveReason: reason || "إغلاق الدعوى وصدور حكم نهائي"
+      } : null);
+    }
+  };
+
+  const handleAutoArchiveClosedCases = () => {
+    if (unarchivedClosedCases.length === 0) return;
+    unarchivedClosedCases.forEach(c => {
+      if (onUpdateCase) {
+        onUpdateCase(c.id, {
+          status: "archived",
+          isArchived: true,
+          archivedAt: new Date().toISOString(),
+          archiveReason: "أرشفة تلقائية للقضايا المغلقة والمنتهية"
+        });
+      }
+    });
+  };
+
   const resetAllFilters = () => {
     setCourtFilter("all");
     setYearFilter("all");
     setSessionStatusFilter("all");
     setCourtTypeFilter("all");
     setSearchQuery("");
+    setArchiveSearchMode("all");
   };
 
-  // Filter cases for Clients and with Comprehensive Filter Bar:
+  // Filter cases for Clients and with Comprehensive Filter Bar & Active/Archived Tabs:
   const visibleCases = useMemo(() => {
     return cases.filter(c => {
+      // 0. Active vs Archived Tab Constraint
+      const isArchived = isCaseArchived(c);
+      if (casesTab === "active" && isArchived) return false;
+      if (casesTab === "archived" && !isArchived) return false;
+
       // 1. Search query constraint
       const query = searchQuery.trim().toLowerCase();
-      const matchesSearch = !query || (
-        c.caseNumber.toLowerCase().includes(query) ||
-        c.clientName.toLowerCase().includes(query) ||
-        c.opponentName.toLowerCase().includes(query) ||
-        c.subject.toLowerCase().includes(query) ||
-        c.competentCourt.toLowerCase().includes(query)
-      );
+      let matchesSearch = true;
+      if (query) {
+        if (casesTab === "archived") {
+          if (archiveSearchMode === "client") {
+            matchesSearch = c.clientName.toLowerCase().includes(query);
+          } else if (archiveSearchMode === "case_number") {
+            const caseNoStr = c.caseNumber.toLowerCase();
+            const yearStr = c.caseYear?.toString() || "";
+            const serialStr = c.serialNumber?.toString() || "";
+            matchesSearch = (
+              caseNoStr.includes(query) ||
+              (yearStr && `${caseNoStr}/${yearStr}`.includes(query)) ||
+              (yearStr && `${caseNoStr} لسنة ${yearStr}`.includes(query)) ||
+              (yearStr && `${caseNoStr} لسنه ${yearStr}`.includes(query)) ||
+              serialStr.includes(query)
+            );
+          } else {
+            // "all": check clientName, caseNumber, opponentName, subject, court, archiveReason, details
+            const caseNoStr = c.caseNumber.toLowerCase();
+            const yearStr = c.caseYear?.toString() || "";
+            const serialStr = c.serialNumber?.toString() || "";
+            matchesSearch = (
+              caseNoStr.includes(query) ||
+              c.clientName.toLowerCase().includes(query) ||
+              c.opponentName.toLowerCase().includes(query) ||
+              c.subject.toLowerCase().includes(query) ||
+              c.competentCourt.toLowerCase().includes(query) ||
+              (yearStr && yearStr.includes(query)) ||
+              (yearStr && `${caseNoStr}/${yearStr}`.includes(query)) ||
+              (serialStr && serialStr.includes(query)) ||
+              (c.details && c.details.toLowerCase().includes(query)) ||
+              (c.archiveReason && c.archiveReason.toLowerCase().includes(query))
+            );
+          }
+        } else {
+          // Active cases search
+          const caseNoStr = c.caseNumber.toLowerCase();
+          const yearStr = c.caseYear?.toString() || "";
+          matchesSearch = (
+            caseNoStr.includes(query) ||
+            c.clientName.toLowerCase().includes(query) ||
+            c.opponentName.toLowerCase().includes(query) ||
+            c.subject.toLowerCase().includes(query) ||
+            c.competentCourt.toLowerCase().includes(query) ||
+            (yearStr && yearStr.includes(query)) ||
+            (c.details && c.details.toLowerCase().includes(query))
+          );
+        }
+      }
 
       // 2. Court Filter
       const matchesCourt = courtFilter === "all" || c.competentCourt === courtFilter;
@@ -974,7 +1138,7 @@ export default function CasesView({
       }
       return matchesSearch && matchesCourt && matchesYear && matchesCourtType && matchesSessionStatus;
     });
-  }, [cases, searchQuery, courtFilter, yearFilter, courtTypeFilter, sessionStatusFilter, currentUser]);
+  }, [cases, casesTab, searchQuery, archiveSearchMode, courtFilter, yearFilter, courtTypeFilter, sessionStatusFilter, currentUser]);
 
   const handleOpenEmailModal = (c: CaseRecord, customMessage?: string) => {
     setEmailNoticeCase(c);
@@ -1159,11 +1323,35 @@ ${c.details || "تم قيد ومتابعة الإجراءات القانونية
       finalOpponent = newOpponentInput.trim();
     }
 
+    // Automatically format case number and year consistently based on local Egyptian court standards
+    const arabicToStandardDigits = (str: string) => {
+      const arabicNumerals = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"];
+      return str.replace(/[٠-٩]/g, (d) => arabicNumerals.indexOf(d).toString());
+    };
+
+    let cleanInput = arabicToStandardDigits(caseNo.trim());
+    let parsedYear = parseInt(caseYr) || new Date().getFullYear();
+    
+    // Extract format like "123/2026" or "123 لسنة 2026" or "123 لسنة 26"
+    const yearMatch = cleanInput.match(/(?:\/|لسنة|\s*-\s*)\s*(\d{2,4})/);
+    if (yearMatch) {
+      let yr = parseInt(yearMatch[1]);
+      if (yr < 100) {
+        yr = yr > 50 ? 1900 + yr : 2000 + yr;
+      }
+      parsedYear = yr;
+      cleanInput = cleanInput.replace(yearMatch[0], '').trim();
+    }
+    
+    // Standardize to digits only
+    const digitsOnly = cleanInput.replace(/\D/g, "");
+    let formattedCaseNo = digitsOnly.length > 0 ? digitsOnly : (cleanInput || "1");
+    
     const newC: CaseRecord = {
       id: "cs-" + Date.now(),
       serialNumber: cases.length + 1,
-      caseNumber: caseNo,
-      caseYear: parseInt(caseYr),
+      caseNumber: formattedCaseNo,
+      caseYear: parsedYear,
       competentCourt: finalCourt || "محكمة ههيا الجزئية",
       courtType: courtType,
       subject: finalSubject || "تبديد وإخلال بالأمانة",
@@ -1204,6 +1392,17 @@ ${c.details || "تم قيد ومتابعة الإجراءات القانونية
 
         {currentUser.role !== UserRole.CLIENT && (
           <div className="flex flex-wrap gap-2.5 items-center">
+            <button
+              id="cases-lexmark-ocr-btn"
+              type="button"
+              onClick={() => setIsCaseOcrOpen(true)}
+              className="px-3.5 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-900 dark:text-amber-300 border border-amber-500/40 text-xs font-black rounded-xl flex items-center gap-1.5 cursor-pointer transition shadow-xs active:scale-95"
+              title="مسح صحيفة الدعوى أو الحكم القضائي واستخراج البيانات عبر Lexmark X54de أو OCR"
+            >
+              <Scan className="w-4 h-4 text-amber-500" />
+              <span>ماسح Lexmark X54de / صحيفة الدعوى</span>
+            </button>
+
             {onOpenDocumentManager && (
               <button
                 id="cases-doc-manager-btn"
@@ -1248,6 +1447,250 @@ ${c.details || "تم قيد ومتابعة الإجراءات القانونية
           </div>
         )}
       </div>
+
+      {/* CASE TABS: ACTIVE VS ARCHIVED */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm" dir="rtl">
+        <div className="flex items-center gap-2">
+          <button
+            id="tab-active-cases"
+            type="button"
+            onClick={() => {
+              setCasesTab("active");
+              setSelectedCaseIds([]);
+            }}
+            className={`px-4 py-2.5 rounded-xl text-xs font-black transition flex items-center gap-2 cursor-pointer ${
+              casesTab === "active"
+                ? "bg-amber-500 text-slate-950 shadow-sm"
+                : "bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/60"
+            }`}
+          >
+            <FolderOpen className="w-4 h-4" />
+            <span>القضايا الجارية والنشطة</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+              casesTab === "active" ? "bg-slate-950 text-amber-400 font-bold" : "bg-slate-200 text-slate-700 font-bold"
+            }`}>
+              {totalActiveCount}
+            </span>
+          </button>
+
+          <button
+            id="tab-archived-cases"
+            type="button"
+            onClick={() => {
+              setCasesTab("archived");
+              setSelectedCaseIds([]);
+            }}
+            className={`px-4 py-2.5 rounded-xl text-xs font-black transition flex items-center gap-2 cursor-pointer ${
+              casesTab === "archived"
+                ? "bg-slate-900 text-white shadow-sm"
+                : "bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/60"
+            }`}
+          >
+            <FolderArchive className="w-4 h-4 text-amber-400" />
+            <span>القضايا المؤرشفة</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+              casesTab === "archived" ? "bg-amber-500 text-slate-950 font-bold" : "bg-slate-200 text-slate-700 font-bold"
+            }`}>
+              {totalArchivedCount}
+            </span>
+          </button>
+        </div>
+
+        {/* Smart Prompt: Auto-Archive Closed Cases */}
+        {casesTab === "active" && unarchivedClosedCases.length > 0 && currentUser.role !== UserRole.CLIENT && (
+          <button
+            id="auto-archive-closed-btn"
+            type="button"
+            onClick={handleAutoArchiveClosedCases}
+            className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300/80 rounded-xl text-xs font-black flex items-center gap-2 transition cursor-pointer shadow-xs"
+            title="نقل كافة القضايا المغلقة والمفصول فيها إلى تبويب الأرشيف فوراً لتقليل الازدحام"
+          >
+            <Archive className="w-4 h-4 text-amber-600" />
+            <span>أرشفة القضايا المغلقة تلقائياً ({unarchivedClosedCases.length})</span>
+          </button>
+        )}
+
+        {casesTab === "archived" && (
+          <div className="flex items-center gap-2 text-xs text-slate-750 font-bold bg-amber-50 px-3.5 py-1.5 rounded-xl border border-amber-200/80">
+            <Archive className="w-3.5 h-3.5 text-amber-600" />
+            <span>أرشيف إلكتروني للقضايا المنتهية والمحفوظة مع بحث سريع مخصص</span>
+          </div>
+        )}
+      </div>
+
+      {/* DEDICATED QUICK SEARCH CONSOLE FOR ARCHIVED CASES */}
+      {casesTab === "archived" && (
+        <div className="bg-gradient-to-br from-slate-900 via-slate-850 to-slate-900 text-white p-5 rounded-2xl border border-slate-750 shadow-md space-y-4 font-sans text-right" dir="rtl">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-750/80 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-amber-500/20 text-amber-400 rounded-xl border border-amber-500/30">
+                <Search className="w-4 h-4 text-amber-400" />
+              </div>
+              <div>
+                <h4 className="text-sm font-black text-white flex items-center gap-2">
+                  <span>البحث السريع في القضايا المؤرشفة</span>
+                  <span className="text-[10px] bg-amber-400 text-slate-950 font-bold px-2 py-0.5 rounded-full">
+                    مباشر وسريع
+                  </span>
+                </h4>
+                <p className="text-xs text-slate-300">
+                  ابحث فوراً بناءً على <strong className="text-amber-300">اسم الموكل</strong> أو <strong className="text-amber-300">رقم القضية الأصلي</strong> لاسترجاع ملفات القضايا المحفوظة.
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Search Criterion Switcher */}
+            <div className="flex items-center bg-slate-800/90 p-1 rounded-xl border border-slate-700 text-xs self-start md:self-auto">
+              <button
+                type="button"
+                onClick={() => setArchiveSearchMode("all")}
+                className={`px-3 py-1 rounded-lg font-bold transition cursor-pointer ${
+                  archiveSearchMode === "all"
+                    ? "bg-amber-500 text-slate-950 shadow-xs"
+                    : "text-slate-300 hover:text-white"
+                }`}
+              >
+                🔍 بحث شامل
+              </button>
+              <button
+                type="button"
+                onClick={() => setArchiveSearchMode("client")}
+                className={`px-3 py-1 rounded-lg font-bold transition cursor-pointer flex items-center gap-1 ${
+                  archiveSearchMode === "client"
+                    ? "bg-amber-500 text-slate-950 shadow-xs"
+                    : "text-slate-300 hover:text-white"
+                }`}
+              >
+                <span>👤 باسم الموكل</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setArchiveSearchMode("case_number")}
+                className={`px-3 py-1 rounded-lg font-bold transition cursor-pointer flex items-center gap-1 ${
+                  archiveSearchMode === "case_number"
+                    ? "bg-amber-500 text-slate-950 shadow-xs"
+                    : "text-slate-300 hover:text-white"
+                }`}
+              >
+                <span>⚖️ برقم القضية</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Search Input Field */}
+          <div className="relative">
+            <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-amber-400">
+              <Search className="w-4 h-4" />
+            </div>
+            <input
+              id="archived-quick-search-input"
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={
+                archiveSearchMode === "client"
+                  ? "اكتب اسم الموكل للبحث في الأرشيف (مثال: أحمد محمد، محمود إبراهيم، سارة علي)..."
+                  : archiveSearchMode === "case_number"
+                  ? "اكتب رقم القضية الأصلي أو السنة (مثال: 5542، 1890، 3411)..."
+                  : "ابحث في الأرشيف باسم الموكل أو رقم القضية الأصلي أو سبب الأرشفة..."
+              }
+              className="w-full pl-20 pr-10 py-3 bg-slate-800/90 hover:bg-slate-800 text-white placeholder:text-slate-400 rounded-xl border border-slate-700 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 outline-none text-xs sm:text-sm font-medium transition"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute inset-y-0 left-2.5 my-auto h-7 px-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 hover:text-white rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>مسح</span>
+              </button>
+            )}
+          </div>
+
+          {/* Quick Suggestion Chips */}
+          <div className="space-y-2 pt-1 text-xs">
+            {archivedClients.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] text-amber-400 font-bold ml-1">موكلون بالأرشيف:</span>
+                {archivedClients.map((cName, idx) => {
+                  const isSelected = searchQuery.trim().toLowerCase() === cName.toLowerCase() && archiveSearchMode === "client";
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        setArchiveSearchMode("client");
+                        setSearchQuery(cName);
+                      }}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition cursor-pointer ${
+                        isSelected
+                          ? "bg-amber-400 text-slate-950 border-amber-400 shadow-xs"
+                          : "bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700 hover:border-slate-600"
+                      }`}
+                    >
+                      👤 {cName}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {archivedCaseNumbers.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] text-amber-400 font-bold ml-1">أرقام القضايا بالأرشيف:</span>
+                {archivedCaseNumbers.map((caseNo, idx) => {
+                  const isSelected = searchQuery.trim() === caseNo && archiveSearchMode === "case_number";
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        setArchiveSearchMode("case_number");
+                        setSearchQuery(caseNo);
+                      }}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold border transition cursor-pointer ${
+                        isSelected
+                          ? "bg-amber-400 text-slate-950 border-amber-400 shadow-xs"
+                          : "bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700 hover:border-slate-600"
+                      }`}
+                    >
+                      ⚖️ قضية #{caseNo}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Active Search Summary in Archive */}
+          {searchQuery.trim() && (
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-750 text-xs text-slate-300">
+              <div className="flex items-center gap-1.5">
+                <span>نتائج البحث في الأرشيف عن:</span>
+                <strong className="text-amber-400 font-bold">"{searchQuery}"</strong>
+                <span className="text-slate-400">
+                  ({archiveSearchMode === "client" ? "اسم الموكل" : archiveSearchMode === "case_number" ? "رقم القضية" : "بحث شامل"})
+                </span>
+                <span className="mr-2 text-white bg-slate-800 px-2 py-0.5 rounded-md border border-slate-700 font-mono font-bold">
+                  {visibleCases.length} قضية مطابقة
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery("");
+                  setArchiveSearchMode("all");
+                }}
+                className="text-[11px] text-amber-400 hover:underline cursor-pointer"
+              >
+                إلغاء البحث والرجوع لكافة القضايا
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* JUDICIAL FILTER BAR & SMART SEARCH */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 text-right" dir="rtl">
@@ -1294,7 +1737,7 @@ ${c.details || "تم قيد ومتابعة الإجراءات القانونية
           <div className="space-y-1.5">
             <label className="block text-[11px] font-bold text-slate-700 flex items-center gap-1">
               <Search className="w-3.5 h-3.5 text-amber-500" />
-              <span>البحث السريع</span>
+              <span>{casesTab === "archived" ? "البحث السريع بالأرشيف" : "البحث السريع"}</span>
             </label>
             <div className="relative">
               <input
@@ -1302,7 +1745,7 @@ ${c.details || "تم قيد ومتابعة الإجراءات القانونية
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="رقم، موكل، اتهام، خصم..."
+                placeholder={casesTab === "archived" ? "اسم الموكل، رقم القضية، سبب الأرشفة..." : "رقم، موكل، اتهام، خصم..."}
                 className="w-full pl-8 pr-3 py-2 bg-slate-50 text-slate-900 rounded-xl border border-slate-200 outline-none text-right focus:border-amber-500 focus:bg-white text-xs transition"
               />
               {searchQuery && (
@@ -1696,152 +2139,325 @@ ${c.details || "تم قيد ومتابعة الإجراءات القانونية
       )}
 
       {selectedCaseIds.length > 0 && (
-        <div className="flex items-center gap-3 p-3 mb-4 bg-amber-50 rounded-xl border border-amber-200">
-          <span className="text-xs font-bold text-amber-800">تم تحديد {selectedCaseIds.length} قضايا</span>
-          <button onClick={() => {
-            const updated = cases.filter(c => !selectedCaseIds.includes(c.id));
-            selectedCaseIds.forEach(id => {
-              if (onDeleteCase) onDeleteCase(id);
-            });
-            setSelectedCaseIds([]);
-          }} className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold rounded-lg transition">حذف المحدد</button>
-          <button onClick={() => {
-            selectedCaseIds.forEach(id => {
-              const c = cases.find(c => c.id === id);
-              if(c && onUpdateCase) onUpdateCase(id, { status: "archived" });
-            });
-            setSelectedCaseIds([]);
-          }} className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold rounded-lg transition">نقل للأرشيف</button>
-          <button onClick={() => setSelectedCaseIds([])} className="px-3 py-1.5 bg-white border border-slate-200 text-slate-500 text-xs font-bold rounded-lg transition">إلغاء التحديد</button>
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 mb-4 bg-amber-50 rounded-2xl border border-amber-200 font-sans" dir="rtl">
+          <span className="text-xs font-black text-amber-950 flex items-center gap-1.5">
+            <span>تم تحديد</span>
+            <strong className="font-mono text-amber-700 bg-white px-2 py-0.5 rounded-md border border-amber-200">{selectedCaseIds.length}</strong>
+            <span>قضايا</span>
+          </span>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {casesTab === "active" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  selectedCaseIds.forEach(id => {
+                    handleArchiveCase(id, "أرشفة جماعية");
+                  });
+                  setSelectedCaseIds([]);
+                }}
+                className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition flex items-center gap-1 cursor-pointer shadow-xs"
+              >
+                <Archive className="w-3.5 h-3.5 text-amber-400" />
+                <span>نقل المحدد للأرشيف</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  selectedCaseIds.forEach(id => {
+                    handleRestoreCase(id);
+                  });
+                  setSelectedCaseIds([]);
+                }}
+                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1 cursor-pointer shadow-xs"
+              >
+                <ArchiveRestore className="w-3.5 h-3.5" />
+                <span>استعادة المحدد للقضايا النشطة</span>
+              </button>
+            )}
+
+            {onDeleteCase && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm(casesTab === "archived" ? "هل أنت متأكد من الحذف النهائي للقضايا المحددة من الأرشيف؟" : "هل أنت متأكد من حذف القضايا المحددة؟")) {
+                    selectedCaseIds.forEach(id => {
+                      onDeleteCase(id);
+                    });
+                    setSelectedCaseIds([]);
+                  }
+                }}
+                className="px-3.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-xl border border-red-200 transition flex items-center gap-1 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>حذف المحدد</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setSelectedCaseIds([])}
+              className="px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
+            >
+              إلغاء التحديد
+            </button>
+          </div>
         </div>
       )}
 
       {/* CASES DISPLAY CARD LIST */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {visibleCases.length === 0 ? (
-          <div className="col-span-full py-12 text-center bg-white rounded-2xl border border-slate-200 text-slate-400 text-sm shadow-sm">
-            مكتب الشناوي: لا يوجد قضايا تطابق معايير البحث والخصومات المروجة في هذه اللحظة.
+          <div className="col-span-full py-12 px-4 text-center bg-white rounded-2xl border border-slate-200 text-slate-400 text-sm shadow-sm space-y-3 font-sans">
+            <div className="w-12 h-12 mx-auto rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-200">
+              <Search className="w-6 h-6" />
+            </div>
+            <p className="font-bold text-slate-800 text-base">
+              {casesTab === "archived" 
+                ? searchQuery.trim()
+                  ? `لا توجد قضايا مؤرشفة تطابق معيار البحث: "${searchQuery}"`
+                  : "لا توجد قضايا مؤرشفة حالياً تطابق معايير الفلترة المحددة."
+                : searchQuery.trim()
+                  ? `لا توجد قضايا جارية تطابق معيار البحث: "${searchQuery}"`
+                  : "لا توجد قضايا جارية ونشطة تطابق معايير الفلترة المحددة."}
+            </p>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              {casesTab === "archived"
+                ? "يمكنك التأكد من كتابة اسم الموكل أو رقم القضية بشكل صحيح، أو الضغط على زر مسح البحث لعرض كامل ملفات الأرشيف."
+                : "يمكنك تعديل معايير البحث أو تصفية المحاكم والسنوات المحددة أعلاه."}
+            </p>
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery("");
+                  setArchiveSearchMode("all");
+                }}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black rounded-xl transition cursor-pointer shadow-xs inline-flex items-center gap-1.5"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>مسح البحث وعرض كافة القضايا</span>
+              </button>
+            )}
           </div>
         ) : (
-          visibleCases.map((c) => (
-            <div
-              id={`case-card-${c.id}`}
-              key={c.id}
-              onClick={() => setSelectedCase(c)}
-              className={`p-5 rounded-2xl border transition text-right space-y-4 shadow-sm hover:shadow-md relative ${
-                selectedCase?.id === c.id 
-                  ? "bg-white border-2 border-amber-500 scale-[1.01]" 
-                  : selectedCaseIds.includes(c.id)
-                  ? "bg-amber-50/50 border-amber-300"
-                  : "bg-white border-slate-200 hover:border-slate-350"
-              }`}
-            >
-              <div className="absolute top-4 left-4 z-10" onClick={(e) => e.stopPropagation()}>
-                <input 
-                  type="checkbox"
-                  checked={selectedCaseIds.includes(c.id)}
-                  onChange={(e) => {
-                    if (e.target.checked) setSelectedCaseIds(prev => [...prev, c.id]);
-                    else setSelectedCaseIds(prev => prev.filter(id => id !== c.id));
-                  }}
-                  className="w-4 h-4 text-amber-500 rounded border-slate-300 focus:ring-amber-500 cursor-pointer"
-                />
-              </div>
+          visibleCases.map((c) => {
+            const archived = isCaseArchived(c);
+            return (
+              <div
+                id={`case-card-${c.id}`}
+                key={c.id}
+                onClick={() => setSelectedCase(c)}
+                className={`p-5 rounded-2xl border transition text-right space-y-4 shadow-sm hover:shadow-md relative ${
+                  selectedCase?.id === c.id 
+                    ? "bg-white border-2 border-amber-500 scale-[1.01]" 
+                    : selectedCaseIds.includes(c.id)
+                    ? "bg-amber-50/50 border-amber-300"
+                    : archived
+                    ? "bg-slate-50/80 border-slate-300/80 hover:border-slate-400"
+                    : "bg-white border-slate-200 hover:border-slate-350"
+                }`}
+              >
+                <div className="absolute top-4 left-4 z-10" onClick={(e) => e.stopPropagation()}>
+                  <input 
+                    type="checkbox"
+                    checked={selectedCaseIds.includes(c.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) setSelectedCaseIds(prev => [...prev, c.id]);
+                      else setSelectedCaseIds(prev => prev.filter(id => id !== c.id));
+                    }}
+                    className="w-4 h-4 text-amber-500 rounded border-slate-300 focus:ring-amber-500 cursor-pointer"
+                  />
+                </div>
 
-              <div className="flex justify-between items-center pb-2 border-b border-slate-100 pr-6">
-                <span className="px-2 py-0.5 bg-amber-50 rounded-lg text-amber-800 text-[10px] font-black font-sans">رقم {c.caseNumber} {c.caseYear && `سنة ${c.caseYear}`}</span>
-                <span className="text-slate-400 text-[10px] font-sans">مسلسل رقم: #{c.serialNumber}</span>
-              </div>
-
-              <div className="space-y-1.5 text-xs text-slate-700 leading-relaxed font-sans">
-                <p><span className="text-slate-400 font-bold ml-1.5">المحكمة المختصة:</span> <span className="text-slate-900 font-bold">{c.competentCourt}</span></p>
-                <p><span className="text-slate-400 font-bold ml-1.5">النوع الاختصاصي:</span> <span className="text-amber-805 font-bold">{c.courtType}</span></p>
-                <p><span className="text-slate-400 font-bold ml-1.5">الاتهام / الموضوع:</span> <span className="text-slate-950 font-black">{c.subject}</span></p>
-                <p><span className="text-slate-400 font-bold ml-1.5">الموكل (صفته):</span> <span className="text-slate-900 font-bold">{c.clientName}</span> (<span className="text-slate-550 font-bold">{c.clientRole}</span> - <span className="text-amber-700 font-extrabold">{getClientRoleLabel(c.clientRole, c, language)}</span>)</p>
-                <p><span className="text-slate-400 font-bold ml-1.5">الخصم المرتبط:</span> <span className="text-red-700 font-bold">{c.opponentName}</span></p>
-                <p><span className="text-slate-400 font-bold ml-1.5">الجلسة القادمة:</span> <span className="text-amber-800 font-black font-mono text-sm">{c.nextSessionDate}</span></p>
-              </div>
-
-              {/* Case Stage & Milestone Preview Chip */}
-              <div className="pt-1 flex flex-wrap items-center justify-between gap-1.5 border-t border-slate-100/80">
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-900 border border-amber-500/20 flex items-center gap-1">
-                  <Clock className="w-3 h-3 text-amber-600" />
-                  <span>
-                    {c.stage === "registered" ? "قيد الدعوى" : 
-                     c.stage === "first_session" ? "الجلسة الأولى" : 
-                     c.stage === "judgment" ? "صدور الحكم" : 
-                     c.stage === "appeal" ? "الاستئناف والطعن" : "محطات التقاضي"}
-                  </span>
-                  {c.timeline && (
-                    <span className="text-[9px] bg-white px-1 rounded font-mono text-amber-700 font-black">
-                      {c.timeline.filter(m => m.status === "completed").length}/{c.timeline.length}
+                <div className="flex flex-wrap justify-between items-center pb-2 border-b border-slate-100 pr-6 gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="px-2 py-0.5 bg-amber-50 rounded-lg text-amber-800 text-[10px] font-black font-sans">
+                      رقم {c.caseNumber} {c.caseYear && `سنة ${c.caseYear}`}
                     </span>
-                  )}
-                </span>
+                    {archived ? (
+                      <span className="px-2 py-0.5 bg-slate-900 text-amber-400 border border-slate-750 rounded-lg text-[10px] font-black flex items-center gap-1">
+                        <Archive className="w-3 h-3" />
+                        <span>مؤرشفة</span>
+                      </span>
+                    ) : c.stage === "closed" ? (
+                      <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-[10px] font-black flex items-center gap-1">
+                        <Lock className="w-3 h-3 text-amber-700" />
+                        <span>مغلقة/حكم نهائي</span>
+                      </span>
+                    ) : null}
+                  </div>
+                  <span className="text-slate-400 text-[10px] font-sans">مسلسل رقم: #{c.serialNumber}</span>
+                </div>
 
-                {keepExportSuccess === c.id ? (
-                  <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded">
-                    <Check className="w-3 h-3" /> تم الحفظ في Keep
+                <div className="space-y-1.5 text-xs text-slate-700 leading-relaxed font-sans">
+                  <p><span className="text-slate-400 font-bold ml-1.5">المحكمة المختصة:</span> <span className="text-slate-900 font-bold">{c.competentCourt}</span></p>
+                  <p><span className="text-slate-400 font-bold ml-1.5">النوع الاختصاصي:</span> <span className="text-amber-805 font-bold">{c.courtType}</span></p>
+                  <p><span className="text-slate-400 font-bold ml-1.5">الاتهام / الموضوع:</span> <span className="text-slate-950 font-black">{c.subject}</span></p>
+                  <p><span className="text-slate-400 font-bold ml-1.5">الموكل (صفته):</span> <span className="text-slate-900 font-bold">{c.clientName}</span> (<span className="text-slate-550 font-bold">{c.clientRole}</span> - <span className="text-amber-700 font-extrabold">{getClientRoleLabel(c.clientRole, c, language)}</span>)</p>
+                  <p><span className="text-slate-400 font-bold ml-1.5">الخصم المرتبط:</span> <span className="text-red-700 font-bold">{c.opponentName}</span></p>
+                  <p><span className="text-slate-400 font-bold ml-1.5">الجلسة القادمة:</span> <span className="text-amber-800 font-black font-mono text-sm">{c.nextSessionDate}</span></p>
+                  {archived && c.archiveReason && (
+                    <p className="text-[11px] text-slate-500 bg-slate-100/80 p-1.5 rounded-lg border border-slate-200">
+                      <span className="font-bold text-slate-700 ml-1">سبب الأرشفة:</span>
+                      <span>{c.archiveReason}</span>
+                    </p>
+                  )}
+                </div>
+
+                {/* Case Stage & Milestone Preview Chip */}
+                <div className="pt-1 flex flex-wrap items-center justify-between gap-1.5 border-t border-slate-100/80">
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-900 border border-amber-500/20 flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-amber-600" />
+                    <span>
+                      {c.stage === "registered" ? "قيد الدعوى" : 
+                       c.stage === "first_session" ? "الجلسة الأولى" : 
+                       c.stage === "judgment" ? "صدور الحكم" : 
+                       c.stage === "appeal" ? "الاستئناف والطعن" : 
+                       c.stage === "closed" ? "دعوى مغلقة ومنتهية" : "محطات التقاضي"}
+                    </span>
+                    {c.timeline && (
+                      <span className="text-[9px] bg-white px-1 rounded font-mono text-amber-700 font-black">
+                        {c.timeline.filter(m => m.status === "completed").length}/{c.timeline.length}
+                      </span>
+                    )}
                   </span>
-                ) : (
+
+                  {keepExportSuccess === c.id ? (
+                    <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded">
+                      <Check className="w-3 h-3" /> تم الحفظ في Keep
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleExportCaseToKeep(c)}
+                      className="text-[10px] font-bold text-slate-500 hover:text-amber-700 flex items-center gap-1 transition cursor-pointer"
+                      title="حفظ بطاقة ملخص في Google Keep"
+                    >
+                      <Bookmark className="w-3 h-3 text-amber-500" />
+                      <span>حفظ في Keep</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Action Toolbar */}
+                <div className="flex flex-wrap items-center justify-between gap-1.5 pt-2 border-t border-slate-100 font-sans" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedCase(c);
+                        setDrawerActiveTab("details");
+                      }}
+                      className="text-xs font-bold text-slate-700 hover:text-amber-700 flex items-center gap-1 cursor-pointer bg-slate-100/70 hover:bg-slate-200/70 px-2 py-1 rounded-lg transition"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>الملف</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedCase(c);
+                        setDrawerActiveTab("timeline");
+                      }}
+                      className="text-xs font-black text-amber-900 bg-amber-100 hover:bg-amber-200 px-2.5 py-1 rounded-lg transition flex items-center gap-1 cursor-pointer shadow-2xs"
+                    >
+                      <Clock className="w-3.5 h-3.5 text-amber-700" />
+                      <span>⏱️ المسار</span>
+                    </button>
+
+                    {/* Fee Details & Invoice Trigger Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const found = clients.find(cl => cl.name.trim() === c.clientName.trim());
+                        const matchedClient: ClientProfile = found || {
+                          id: "cl-" + c.id,
+                          serialNumber: 1,
+                          name: c.clientName,
+                          nationalId: "28800000000000",
+                          poaNumber: "1000",
+                          poaLetter: "أ",
+                          poaYear: 2025,
+                          poaOffice: "مكتب توثيق الشرقية",
+                          caseNumber: c.caseNumber,
+                          caseYear: typeof c.caseYear === "number" ? c.caseYear : 2026,
+                          competentCourt: c.competentCourt,
+                          subject: c.subject || "قضية متداولة",
+                          remainingFees: typeof c.estimatedFees === "number" ? c.estimatedFees : 5000,
+                          createdAt: new Date().toISOString()
+                        };
+                        if (onOpenFeeDetails) {
+                          onOpenFeeDetails(matchedClient, c);
+                        } else {
+                          setSelectedCaseForFeeModal({ client: matchedClient, caseRecord: c });
+                        }
+                      }}
+                      className="text-xs font-bold text-emerald-800 dark:text-emerald-300 hover:text-emerald-950 flex items-center gap-1 cursor-pointer bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 px-2 py-1 rounded-lg transition border border-emerald-200 dark:border-emerald-800"
+                      title={language === "en" ? "View fee details, balance & invoice" : "عرض تفاصيل الأتعاب والمستحقات وطباعة الفاتورة"}
+                    >
+                      <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>{language === "en" ? "Fees & Invoice" : "الأتعاب والفاتورة"}</span>
+                    </button>
+
+                    {/* Archive / Restore Action for Case */}
+                    {archived ? (
+                      <button
+                        type="button"
+                        onClick={() => handleRestoreCase(c.id)}
+                        className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-lg text-xs font-bold border border-emerald-200 transition flex items-center gap-1 cursor-pointer"
+                        title="استعادة القضية للقائمة النشطة"
+                      >
+                        <ArchiveRestore className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>استعادة</span>
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleArchiveCase(c.id)}
+                          className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-lg text-xs font-bold border border-slate-200/80 transition flex items-center gap-1 cursor-pointer"
+                          title="أرشفة القضية ونقلها لتبويب الأرشيف"
+                        >
+                          <Archive className="w-3.5 h-3.5 text-slate-500" />
+                          <span>أرشفة</span>
+                        </button>
+                        {c.stage === "closed" && (
+                          <button
+                            type="button"
+                            onClick={() => handleCloseAndArchiveCase(c.id)}
+                            className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-950 rounded-lg text-xs font-black border border-amber-300 transition flex items-center gap-1 cursor-pointer"
+                            title="أرشفة القضية المغلقة"
+                          >
+                            <Archive className="w-3.5 h-3.5 text-amber-700" />
+                            <span>أرشفة المغلقة</span>
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+
                   <button
                     type="button"
-                    onClick={() => handleExportCaseToKeep(c)}
-                    className="text-[10px] font-bold text-slate-500 hover:text-amber-700 flex items-center gap-1 transition cursor-pointer"
-                    title="حفظ بطاقة ملخص في Google Keep"
+                    onClick={() => handleOpenEmailModal(c)}
+                    className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-lg text-[11px] font-bold border border-amber-200/60 transition cursor-pointer flex items-center gap-1"
+                    title="إرسال تنبيه بالبريد الإلكتروني لموكل هذه القضية"
                   >
-                    <Bookmark className="w-3 h-3 text-amber-500" />
-                    <span>حفظ في Keep</span>
+                    <Mail className="w-3 h-3 text-amber-600" />
+                    <span>📧 إشعار</span>
                   </button>
+                </div>
+
+                {c.estimatedFees && (
+                  <div className="p-3 bg-emerald-50 rounded border border-emerald-150 text-[11px] text-right text-emerald-805 font-bold font-sans">
+                    ⚡ أتعاب استرشادية من الذكاء الاصطناعي لعام ٢٠٢٦ مصونة: {c.estimatedFees.minEgp} - {c.estimatedFees.maxEgp} EGP
+                  </div>
                 )}
               </div>
-
-              {/* Action Toolbar */}
-              <div className="flex flex-wrap items-center justify-between gap-1.5 pt-2 border-t border-slate-100 font-sans" onClick={(e) => e.stopPropagation()}>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedCase(c);
-                      setDrawerActiveTab("details");
-                    }}
-                    className="text-xs font-bold text-slate-700 hover:text-amber-700 flex items-center gap-1 cursor-pointer bg-slate-100/70 hover:bg-slate-200/70 px-2 py-1 rounded-lg transition"
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                    <span>الملف</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedCase(c);
-                      setDrawerActiveTab("timeline");
-                    }}
-                    className="text-xs font-black text-amber-900 bg-amber-100 hover:bg-amber-200 px-2.5 py-1 rounded-lg transition flex items-center gap-1 cursor-pointer shadow-2xs"
-                  >
-                    <Clock className="w-3.5 h-3.5 text-amber-700" />
-                    <span>⏱️ المسار الزمني</span>
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => handleOpenEmailModal(c)}
-                  className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-lg text-[11px] font-bold border border-amber-200/60 transition cursor-pointer flex items-center gap-1"
-                  title="إرسال تنبيه بالبريد الإلكتروني لموكل هذه القضية"
-                >
-                  <Mail className="w-3 h-3 text-amber-600" />
-                  <span>📧 إشعار</span>
-                </button>
-              </div>
-
-              {c.estimatedFees && (
-                <div className="p-3 bg-emerald-50 rounded border border-emerald-150 text-[11px] text-right text-emerald-805 font-bold font-sans">
-                  ⚡ أتعاب استرشادية من الذكاء الاصطناعي لعام ٢٠٢٦ مصونة: {c.estimatedFees.minEgp} - {c.estimatedFees.maxEgp} EGP
-                </div>
-              )}
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
@@ -1973,6 +2589,62 @@ ${c.details || "تم قيد ومتابعة الإجراءات القانونية
             ) : (
               /* TAB 1: CASE DETAILS & ATTACHMENTS */
               <div className="flex-grow space-y-5 overflow-y-auto pr-1">
+                {/* Archive / Active Status Management Bar inside Drawer */}
+                <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-slate-100/90 rounded-xl border border-slate-200 text-xs">
+                  <div className="flex items-center gap-2">
+                    {isCaseArchived(selectedCase) ? (
+                      <span className="px-2.5 py-1 bg-slate-900 text-amber-400 border border-slate-700 rounded-lg font-black flex items-center gap-1.5">
+                        <Archive className="w-3.5 h-3.5" />
+                        <span>قضية مؤرشفة ومغلقة</span>
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-1 bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-lg font-black flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+                        <span>قضية جارية ونشطة</span>
+                      </span>
+                    )}
+                    {selectedCase.stage === "closed" && (
+                      <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded text-[10px] font-bold">
+                        مفصول فيها
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {isCaseArchived(selectedCase) ? (
+                      <button
+                        type="button"
+                        onClick={() => handleRestoreCase(selectedCase.id)}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs transition flex items-center gap-1 cursor-pointer shadow-xs"
+                      >
+                        <ArchiveRestore className="w-3.5 h-3.5" />
+                        <span>استعادة للقضايا النشطة</span>
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleArchiveCase(selectedCase.id)}
+                          className="px-3 py-1.5 bg-white hover:bg-slate-200 text-slate-800 border border-slate-300 rounded-lg font-bold text-xs transition flex items-center gap-1 cursor-pointer"
+                        >
+                          <Archive className="w-3.5 h-3.5 text-slate-600" />
+                          <span>نقل للأرشيف</span>
+                        </button>
+                        {selectedCase.stage !== "closed" && (
+                          <button
+                            type="button"
+                            onClick={() => handleCloseAndArchiveCase(selectedCase.id)}
+                            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg font-black text-xs transition flex items-center gap-1 cursor-pointer shadow-xs"
+                          >
+                            <Lock className="w-3.5 h-3.5" />
+                            <span>إغلاق وحفظ بالأرشيف</span>
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+
                 {/* 1. Case Metadata Breakdown */}
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/60 space-y-2 text-xs">
                   <p className="flex justify-between border-b border-slate-100 pb-1.5"><span className="text-slate-400">سنة القضية:</span> <strong className="text-slate-900">{selectedCase.caseYear}</strong></p>
@@ -2892,6 +3564,37 @@ ${c.details || "تم قيد ومتابعة الإجراءات القانونية
           </div>
         </div>
       )}
+
+      {/* Dedicated Section OCR Modal for Cases & Lawsuits */}
+      <SectionDedicatedOcrModal
+        isOpen={isCaseOcrOpen}
+        onClose={() => setIsCaseOcrOpen(false)}
+        section="cases"
+        language={language}
+        onApplyData={(res) => {
+          if (res.caseNumber) setCaseNo(res.caseNumber);
+          if (res.caseYear) setCaseYr(res.caseYear);
+          if (res.courtName) setSelectedCourt(res.courtName);
+          if (res.courtType) setCourtType(res.courtType);
+          if (res.plaintiff) setClientName(res.plaintiff);
+          if (res.defendant) setOpponentName(res.defendant);
+          if (res.caseSubject) setSelectedSubject(res.caseSubject);
+          if (res.requestsSummary) setCaseDetails(res.requestsSummary);
+          setShowAddForm(true);
+        }}
+      />
+
+      {/* Case Fee Details & Client Invoice Modal */}
+      <ClientFeeDetailsModal
+        isOpen={!!selectedCaseForFeeModal}
+        onClose={() => setSelectedCaseForFeeModal(null)}
+        client={selectedCaseForFeeModal?.client || null}
+        caseRecord={selectedCaseForFeeModal?.caseRecord || null}
+        fees={[]}
+        language={language}
+        currentUser={currentUser}
+        allCases={cases}
+      />
 
     </div>
   );

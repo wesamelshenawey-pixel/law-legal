@@ -5,8 +5,8 @@ export const TRANSLATIONS: { [key: string]: { [lang: string]: string } } = {
     en: "Main Dashboard"
   },
   sessions: {
-    ar: "روزنامة الجلسات والإنذارات",
-    en: "Sessions & Calendar"
+    ar: "التقويم والأجندة القضائية",
+    en: "Judicial Calendar & Sessions Agenda"
   },
   cases: {
     ar: "إدارة الدعاوى والقضايا",

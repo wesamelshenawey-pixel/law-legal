@@ -1,6 +1,24 @@
 import React, { useState, useEffect } from "react";
 import { PlatformUser, UserRole } from "../types";
-import { Cpu, Brain, FileText, FileUp, Languages, Lock, CheckCircle, HelpCircle, Image as ImageIcon, X } from "lucide-react";
+import { 
+  Cpu, 
+  Brain, 
+  FileText, 
+  FileUp, 
+  Languages, 
+  Lock, 
+  CheckCircle, 
+  HelpCircle, 
+  Image as ImageIcon, 
+  X,
+  Scale,
+  MessageCircle,
+  Sparkles,
+  Send,
+  Copy,
+  CheckCircle2,
+  AlertCircle
+} from "lucide-react";
 import { LEGAL_PROMPTS } from "../utils/prompts";
 import { requestWorkspaceAuth, getStoredWorkspaceToken, fetchGooglePhotos, GooglePhoto } from "../utils/workspaceService";
 
@@ -15,8 +33,10 @@ export default function AiAssistantView({ currentUser, onUpdateUserSubscription 
   const [showPayModal, setShowPayModal] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
-  // AI Tool Selection
-  const [activeTool, setActiveTool] = useState<"document-analyzer" | "briefs" | "loopholes" | "contracts" | "chat" | "ocr" | "prompts">("prompts");
+  // AI Tool Selection (Covering all 5 core functions requested)
+  const [activeTool, setActiveTool] = useState<
+    "document-analyzer" | "briefs" | "loopholes" | "contracts" | "prosecution" | "legal-advice" | "social-channel" | "chat" | "ocr" | "prompts"
+  >("document-analyzer");
 
   // Inputs
   const [caseDetails, setCaseDetails] = useState("");
@@ -28,6 +48,24 @@ export default function AiAssistantView({ currentUser, onUpdateUserSubscription 
   const [contractType, setContractType] = useState("عقد بيع شقة سكنية");
   const [contractParties, setContractParties] = useState("الطرف الأول: أحمد محمد (بائع)، الطرف الثاني: علي حسن (مشتري)");
   const [contractConditions, setContractConditions] = useState("الثمن 500 ألف جنيه، والتسليم فوري.");
+
+  // Public Prosecution Petitions State (طلبات وتظلمات النيابة العامة)
+  const [prosecutionPetitionType, setProsecutionPetitionType] = useState("تظلم من قرار حفظ محضر شرطة");
+  const [prosecutionOffice, setProsecutionOffice] = useState("نيابة ههيا الجزئية / كلي شمال الزقازيق");
+  const [prosecutionCaseNumber, setProsecutionCaseNumber] = useState("محضر رقم 1452 لسنة 2026 إداري ههيا");
+  const [prosecutionFacts, setProsecutionFacts] = useState("صدر قرار السيد الأستاذ وكيل النائب العام بحفظ المحضر إدارياً رغم ثبوت واقعة التعدي وشهادة الشهود والتقرير الطبي المرفق.");
+  const [prosecutionDemands, setProsecutionDemands] = useState("إلغاء قرار الحفظ الإداري واستيفاء الأوراق بسماع شهود الواقعة وإحالة الأوراق لمحكمة الجنح المختصة.");
+
+  // Egyptian Legal Solutions & Advice State (حلول واستشارات القانون المصري)
+  const [adviceTopic, setAdviceTopic] = useState("استرداد منقولات زوجية وحضانة صغار");
+  const [adviceParties, setAdviceParties] = useState("الموكلة (الزوجة الحاضنة) ضد الزوج");
+  const [adviceFacts, setAdviceFacts] = useState("طرد الزوجة من مسكن الزوجية والامتناع عن تسليم أعيان المنقولات والذهب المثبت بالقائمة ونفقة الصغار.");
+
+  // Social Channel Integration State (واتساب وفيسبوك)
+  const [assistantSocialMsg, setAssistantSocialMsg] = useState("لو سمحت يا متر معايا إيصال أمانة على بياض والمستلم مش عايز يدفع، ايه الإجراء القانوني لحمايتي؟");
+  const [assistantSocialPlatform, setAssistantSocialPlatform] = useState<"whatsapp" | "facebook">("whatsapp");
+  const [assistantSocialSender, setAssistantSocialSender] = useState("أحمد عبد الرحمن");
+  const [assistantSocialPhone, setAssistantSocialPhone] = useState("01012345678");
 
   const [selectedPromptId, setSelectedPromptId] = useState("p1");
 
@@ -210,6 +248,83 @@ export default function AiAssistantView({ currentUser, onUpdateUserSubscription 
     } catch (e) {
       console.error(e);
       setAiOutput("حدث خطأ أثناء تحرير العقد سحابياً.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // 3.5. Generate Public Prosecution Petition (طلبات وتظلمات النيابة العامة)
+  const handleGenerateProsecutionPetition = async () => {
+    setIsGenerating(true);
+    setAiOutput("");
+    try {
+      const res = await fetch("/api/ai/prosecution-petition", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          petitionType: prosecutionPetitionType,
+          clientName: clientName || currentUser.name,
+          opponentName: opponentName,
+          caseOrReportNumber: prosecutionCaseNumber,
+          prosecutionOffice: prosecutionOffice,
+          facts: prosecutionFacts,
+          demands: prosecutionDemands
+        })
+      });
+      const data = await res.json();
+      setAiOutput(data.text || "فشلت صياغة عريضة النيابة العامة.");
+    } catch (e) {
+      console.error(e);
+      setAiOutput("حدث خطأ أثناء صياغة طلب النيابة العامة سحابياً.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // 3.6. Generate Egyptian Legal Advice & Solutions (حلول واستشارات قانونية وفق القانون المصري)
+  const handleGenerateLegalAdvice = async () => {
+    setIsGenerating(true);
+    setAiOutput("");
+    try {
+      const res = await fetch("/api/ai/legal-advice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          consultationTopic: adviceTopic,
+          parties: adviceParties,
+          facts: adviceFacts,
+          jurisdiction: "جمهورية مصر العربية - محكمة النقض والدستورية ومحاكم الاستئناف"
+        })
+      });
+      const data = await res.json();
+      setAiOutput(data.text || "فشل استخراج التكييف والحل القانوني.");
+    } catch (e) {
+      console.error(e);
+      setAiOutput("حدث خطأ أثناء إعداد الرأي والاستشارة القانونية.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // 3.7. Generate Automated Social Channel Reply (ردود واتساب وفيسبوك)
+  const handleGenerateSocialReply = async () => {
+    if (!assistantSocialMsg.trim()) return;
+    setIsGenerating(true);
+    setAiOutput("");
+    try {
+      const res = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: `المطلوب من المستشار الذكي بمكتب وسام الشناوي المحامي صياغة رد آلي فوري لعميل عبر ${assistantSocialPlatform === "whatsapp" ? "واتساب (WhatsApp)" : "فيسبوك مسنجر (Facebook)"}.\nاسم العميل: ${assistantSocialSender}\nرقم الهاتف: ${assistantSocialPhone}\nنص رسالة العميل: "${assistantSocialMsg}"\n\nقم بصياغة رد قانوني فوري مؤصل على مواد القانون المصري لعام 2026، بأسلوب مهذب ومطمئن مع التنويه بإمكانية الاتصال بمكتب المحامي على 01283233555.`,
+          history: []
+        })
+      });
+      const data = await res.json();
+      setAiOutput(data.text || "تم تجهيز الرد الآلي بنجاح.");
+    } catch (e) {
+      console.error(e);
+      setAiOutput("حدث خطأ أثناء توليد الرد الآلي للشبكات الاجتماعية.");
     } finally {
       setIsGenerating(false);
     }
@@ -539,69 +654,96 @@ export default function AiAssistantView({ currentUser, onUpdateUserSubscription 
           
           {/* Right Sidebar options selector */}
           <div className="bg-white p-4 rounded-2xl border border-slate-200 space-y-1 shadow-sm h-fit">
-            <p className="text-[10px] text-slate-400 font-bold pr-1 mb-2">أدوات الذكاء المقنن</p>
+            <p className="text-[10px] text-slate-400 font-bold pr-1 mb-2">منظومة الوكلاء والأدوات الذكية (5 في 1)</p>
             
             <button
               id="ai-tool-document-analyzer"
               onClick={() => { setActiveTool("document-analyzer"); setAiOutput(""); }}
-              className={`w-full text-right px-3 py-2.5 rounded-lg text-xs font-semibold flex items-center justify-between transition cursor-pointer ${activeTool === "document-analyzer" ? "bg-amber-500 text-slate-900 font-black shadow-sm" : "text-slate-705 hover:bg-slate-50"}`}
+              className={`w-full text-right px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-between transition cursor-pointer ${activeTool === "document-analyzer" ? "bg-amber-500 text-slate-900 font-black shadow-sm" : "text-slate-700 hover:bg-slate-50"}`}
             >
               <span>المحلل القانوني الشامل</span>
-              <FileUp className="w-4 h-4 text-slate-500" />
-            </button>
-
-            <button
-              id="ai-tool-briefs"
-              onClick={() => { setActiveTool("briefs"); setAiOutput(""); }}
-              className={`w-full text-right px-3 py-2.5 rounded-lg text-xs font-semibold flex items-center justify-between transition cursor-pointer ${activeTool === "briefs" ? "bg-amber-500 text-slate-900 font-black shadow-sm" : "text-slate-705 hover:bg-slate-50"}`}
-            >
-              <span>تحرير مذكرات دفاع جنائية</span>
-              <FileText className="w-4 h-4 text-slate-500" />
-            </button>
-
-            <button
-              id="ai-tool-loopholes"
-              onClick={() => { setActiveTool("loopholes"); setAiOutput(""); }}
-              className={`w-full text-right px-3 py-2.5 rounded-lg text-xs font-semibold flex items-center justify-between transition cursor-pointer ${activeTool === "loopholes" ? "bg-amber-500 text-slate-900 font-black shadow-sm" : "text-slate-705 hover:bg-slate-50"}`}
-            >
-              <span>استنباط الثغرات القانونية</span>
-              <HelpCircle className="w-4 h-4 text-slate-500" />
-            </button>
-
-            <button
-              id="ai-tool-contracts"
-              onClick={() => { setActiveTool("contracts"); setAiOutput(""); }}
-              className={`w-full text-right px-3 py-2.5 rounded-lg text-xs font-semibold flex items-center justify-between transition cursor-pointer ${activeTool === "contracts" ? "bg-amber-500 text-slate-900 font-black shadow-sm" : "text-slate-705 hover:bg-slate-50"}`}
-            >
-              <span>صياغة عقود مدنية وتجارية</span>
-              <Languages className="w-4 h-4 text-slate-500" />
+              <Brain className="w-4 h-4 text-slate-500" />
             </button>
 
             <button
               id="ai-tool-ocr"
               onClick={() => { setActiveTool("ocr"); setAiOutput(""); }}
-              className={`w-full text-right px-3 py-2.5 rounded-lg text-xs font-semibold flex items-center justify-between transition cursor-pointer ${activeTool === "ocr" ? "bg-amber-500 text-slate-900 font-black shadow-sm" : "text-slate-705 hover:bg-slate-50"}`}
+              className={`w-full text-right px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-between transition cursor-pointer ${activeTool === "ocr" ? "bg-amber-500 text-slate-900 font-black shadow-sm" : "text-slate-700 hover:bg-slate-50"}`}
             >
-              <span>فك نصوص خطوط اليد (OCR)</span>
+              <span>1. فك واستخراج النصوص (OCR)</span>
               <FileUp className="w-4 h-4 text-slate-500" />
             </button>
 
             <button
-              id="ai-tool-prompts"
-              onClick={() => { setActiveTool("prompts"); setAiOutput(""); }}
-              className={`w-full text-right px-3 py-2.5 rounded-lg text-xs font-semibold flex items-center justify-between transition cursor-pointer ${activeTool === "prompts" ? "bg-amber-500 text-slate-900 font-black shadow-sm" : "text-slate-705 hover:bg-slate-50"}`}
+              id="ai-tool-loopholes"
+              onClick={() => { setActiveTool("loopholes"); setAiOutput(""); }}
+              className={`w-full text-right px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-between transition cursor-pointer ${activeTool === "loopholes" ? "bg-amber-500 text-slate-900 font-black shadow-sm" : "text-slate-700 hover:bg-slate-50"}`}
             >
-              <span>مكتبة البرومبتات القانونية</span>
+              <span>2. كشف الثغرات ونقاط الضعف</span>
+              <HelpCircle className="w-4 h-4 text-slate-500" />
+            </button>
+
+            <button
+              id="ai-tool-briefs"
+              onClick={() => { setActiveTool("briefs"); setAiOutput(""); }}
+              className={`w-full text-right px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-between transition cursor-pointer ${activeTool === "briefs" ? "bg-amber-500 text-slate-900 font-black shadow-sm" : "text-slate-700 hover:bg-slate-50"}`}
+            >
+              <span>3. تحرير مذكرات الدفاع القضائية</span>
               <FileText className="w-4 h-4 text-slate-500" />
+            </button>
+
+            <button
+              id="ai-tool-contracts"
+              onClick={() => { setActiveTool("contracts"); setAiOutput(""); }}
+              className={`w-full text-right px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-between transition cursor-pointer ${activeTool === "contracts" ? "bg-amber-500 text-slate-900 font-black shadow-sm" : "text-slate-700 hover:bg-slate-50"}`}
+            >
+              <span>4. صياغة العقود المدنية والتجارية</span>
+              <Languages className="w-4 h-4 text-slate-500" />
+            </button>
+
+            <button
+              id="ai-tool-prosecution"
+              onClick={() => { setActiveTool("prosecution"); setAiOutput(""); }}
+              className={`w-full text-right px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-between transition cursor-pointer ${activeTool === "prosecution" ? "bg-amber-500 text-slate-900 font-black shadow-sm" : "text-slate-700 hover:bg-slate-50"}`}
+            >
+              <span>5. طلبات وتظلمات النيابة العامة</span>
+              <Scale className="w-4 h-4 text-amber-600" />
+            </button>
+
+            <button
+              id="ai-tool-legal-advice"
+              onClick={() => { setActiveTool("legal-advice"); setAiOutput(""); }}
+              className={`w-full text-right px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-between transition cursor-pointer ${activeTool === "legal-advice" ? "bg-amber-500 text-slate-900 font-black shadow-sm" : "text-slate-700 hover:bg-slate-50"}`}
+            >
+              <span>6. حلول واستشارات القانون المصري</span>
+              <Sparkles className="w-4 h-4 text-amber-600" />
+            </button>
+
+            <button
+              id="ai-tool-social-channel"
+              onClick={() => { setActiveTool("social-channel"); setAiOutput(""); }}
+              className={`w-full text-right px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-between transition cursor-pointer ${activeTool === "social-channel" ? "bg-emerald-600 text-white font-black shadow-sm" : "text-slate-700 hover:bg-slate-50"}`}
+            >
+              <span>7. وكيل واتساب وفيسبوك الآلي</span>
+              <MessageCircle className="w-4 h-4 text-emerald-500" />
             </button>
 
             <button
               id="ai-tool-chat"
               onClick={() => { setActiveTool("chat"); setAiOutput(""); }}
-              className={`w-full text-right px-3 py-2.5 rounded-lg text-xs font-semibold flex items-center justify-between transition cursor-pointer ${activeTool === "chat" ? "bg-amber-500 text-slate-900 font-black shadow-sm" : "text-slate-705 hover:bg-slate-50"}`}
+              className={`w-full text-right px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-between transition cursor-pointer ${activeTool === "chat" ? "bg-amber-500 text-slate-900 font-black shadow-sm" : "text-slate-700 hover:bg-slate-50"}`}
             >
-              <span>محادثة المستشار والمحاور الذكي</span>
+              <span>8. محادثة المستشار الإدراكي</span>
               <Brain className="w-4 h-4 text-slate-500" />
+            </button>
+
+            <button
+              id="ai-tool-prompts"
+              onClick={() => { setActiveTool("prompts"); setAiOutput(""); }}
+              className={`w-full text-right px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-between transition cursor-pointer ${activeTool === "prompts" ? "bg-amber-500 text-slate-900 font-black shadow-sm" : "text-slate-700 hover:bg-slate-50"}`}
+            >
+              <span>9. مكتبة البرومبتات القانونية</span>
+              <FileText className="w-4 h-4 text-slate-500" />
             </button>
           </div>
 
@@ -821,6 +963,292 @@ export default function AiAssistantView({ currentUser, onUpdateUserSubscription 
                     className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-900 font-bold text-xs rounded cursor-pointer transition shadow-sm"
                   >
                     {isGenerating ? "جاري التحرير المدني الرصين..." : "صياغة العقد المدني بالكامل"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 3.5. PUBLIC PROSECUTION PETITIONS (طلبات وتظلمات النيابة العامة) */}
+            {activeTool === "prosecution" && (
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm animate-fade-in">
+                <div className="border-b border-slate-100 pb-2 flex items-center justify-between">
+                  <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                    <Scale className="w-4 h-4 text-amber-600" />
+                    <span>صياغة طلبات وتظلمات النيابة العامة المصرية</span>
+                  </h3>
+                  <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2.5 py-0.5 rounded-full">
+                    معتمد بالديباجة الرسمية
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">نوع الطلب أو التظلم:</label>
+                    <select
+                      value={prosecutionPetitionType}
+                      onChange={(e) => setProsecutionPetitionType(e.target.value)}
+                      className="w-full bg-slate-50 text-slate-900 p-2.5 border border-slate-200 rounded-lg text-right outline-none focus:bg-white focus:border-amber-500 transition text-xs font-sans"
+                    >
+                      <option value="تظلم من قرار حفظ محضر شرطة">تظلم من قرار حفظ محضر شرطة إدارياً</option>
+                      <option value="طلب تمكين من مسكن الزوجية والحضانة (م 44 مكرر مرافعات)">طلب تمكين مسكن الزوجية والحضانة (م 44 مكرر مرافعات)</option>
+                      <option value="طلب استخراج شهادة رسمية من جدول النيابة العامة">طلب استخراج شهادة رسمية من جدول النيابة العامة</option>
+                      <option value="طلب ضم مفردات القضية">طلب ضم مفردات القضية والمحاضر المرتبطة</option>
+                      <option value="طلب تسليم مضبوطات وأحراز">طلب تسليم مضبوطات وأحراز أو سيارة محتجزة</option>
+                      <option value="طلب إعادة قيد ووصف الأوراق وإحالتها للجنح">طلب إعادة قيد ووصف الأوراق وإحالتها للمحكمة المختصة</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">النيابة العامة المختصة:</label>
+                    <input
+                      type="text"
+                      value={prosecutionOffice}
+                      onChange={(e) => setProsecutionOffice(e.target.value)}
+                      placeholder="مثال: نيابة ههيا الجزئية / كلي شمال الزقازيق"
+                      className="w-full bg-slate-50 text-slate-900 p-2 border border-slate-200 rounded text-right outline-none focus:bg-white focus:border-amber-500 transition text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">اسم الطالب / المتظلم (الموكل):</label>
+                    <input
+                      type="text"
+                      value={clientName}
+                      onChange={(e) => setClientName(e.target.value)}
+                      placeholder="اسم الموكل رباعياً"
+                      className="w-full bg-slate-50 text-slate-900 p-2 border border-slate-200 rounded text-right outline-none focus:bg-white focus:border-amber-500 transition text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">اسم الخصم / المشكو في حقه:</label>
+                    <input
+                      type="text"
+                      value={opponentName}
+                      onChange={(e) => setOpponentName(e.target.value)}
+                      placeholder="اسم الخصم أو المشكو في حقه"
+                      className="w-full bg-slate-50 text-slate-900 p-2 border border-slate-200 rounded text-right outline-none focus:bg-white focus:border-amber-500 transition text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">رقم المحضر / القضية والسنة:</label>
+                    <input
+                      type="text"
+                      value={prosecutionCaseNumber}
+                      onChange={(e) => setProsecutionCaseNumber(e.target.value)}
+                      placeholder="مثال: محضر رقم 1452 لسنة 2026 إداري ههيا"
+                      className="w-full bg-slate-50 text-slate-900 p-2 border border-slate-200 rounded text-right outline-none focus:bg-white focus:border-amber-500 transition text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">الطلبات الختامية الجازمة:</label>
+                    <input
+                      type="text"
+                      value={prosecutionDemands}
+                      onChange={(e) => setProsecutionDemands(e.target.value)}
+                      placeholder="مثال: إلغاء قرار الحفظ واستيفاء التحقيق بسماع الشهود"
+                      className="w-full bg-slate-50 text-slate-900 p-2 border border-slate-200 rounded text-right outline-none focus:bg-white focus:border-amber-500 transition text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold text-xs mb-1">سياق الوقائع والأسباب الجوهرية للطلب:</label>
+                  <textarea
+                    rows={4}
+                    value={prosecutionFacts}
+                    onChange={(e) => setProsecutionFacts(e.target.value)}
+                    placeholder="اكتب تفاصيل واقعة التظلم أو أسباب طلب التمكين أو استخراج الشهادة..."
+                    className="w-full p-3 bg-slate-50 text-slate-900 border border-slate-200 rounded text-right text-xs outline-none focus:bg-white focus:border-amber-500 transition leading-relaxed font-sans"
+                  />
+                </div>
+
+                <div className="flex justify-end pt-1">
+                  <button
+                    onClick={handleGenerateProsecutionPetition}
+                    disabled={isGenerating}
+                    className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 disabled:opacity-50 text-slate-950 font-black text-xs rounded-xl cursor-pointer transition shadow-md flex items-center gap-2"
+                  >
+                    <Scale className={`w-4 h-4 ${isGenerating ? "animate-spin" : ""}`} />
+                    <span>{isGenerating ? "جاري صياغة العريضة القضائية..." : "صياغة عريضة النيابة العامة الرسمية"}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 3.6. LEGAL SOLUTIONS & ADVICE (الحلول والاستشارات القانونية) */}
+            {activeTool === "legal-advice" && (
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm animate-fade-in">
+                <div className="border-b border-slate-100 pb-2 flex items-center justify-between">
+                  <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-600" />
+                    <span>تقديم الحلول والاستشارات القانونية وفق القانون المصري</span>
+                  </h3>
+                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full">
+                    مؤصل على أحكام محكمة النقض 2026
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">موضوع الاستشارة أو النزاع:</label>
+                    <input
+                      type="text"
+                      value={adviceTopic}
+                      onChange={(e) => setAdviceTopic(e.target.value)}
+                      placeholder="مثال: استرداد منقولات زوجية وشبكة ذهبية"
+                      className="w-full bg-slate-50 text-slate-900 p-2 border border-slate-200 rounded text-right outline-none focus:bg-white focus:border-amber-500 transition text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">أطراف النزاع ومراكزهم:</label>
+                    <input
+                      type="text"
+                      value={adviceParties}
+                      onChange={(e) => setAdviceParties(e.target.value)}
+                      placeholder="مثال: الموكلة (الزوجة الحاضنة) ضد الزوج"
+                      className="w-full bg-slate-50 text-slate-900 p-2 border border-slate-200 rounded text-right outline-none focus:bg-white focus:border-amber-500 transition text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold text-xs mb-1">سرد وقائع المسألة والملابسات بالتفصيل:</label>
+                  <textarea
+                    rows={4}
+                    value={adviceFacts}
+                    onChange={(e) => setAdviceFacts(e.target.value)}
+                    placeholder="اشرح ملابسات النزاع، العقود أو الإيصالات أو المحاضر المتاحة، والهدف المراد تحقيقه..."
+                    className="w-full p-3 bg-slate-50 text-slate-900 border border-slate-200 rounded text-right text-xs outline-none focus:bg-white focus:border-amber-500 transition leading-relaxed font-sans"
+                  />
+                </div>
+
+                <div className="flex justify-end pt-1">
+                  <button
+                    onClick={handleGenerateLegalAdvice}
+                    disabled={isGenerating}
+                    className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 disabled:opacity-50 text-slate-950 font-black text-xs rounded-xl cursor-pointer transition shadow-md flex items-center gap-2"
+                  >
+                    <Sparkles className={`w-4 h-4 ${isGenerating ? "animate-spin" : ""}`} />
+                    <span>{isGenerating ? "جاري استنباط الحلول والتكييف القانوني..." : "استخراج التقرير الاستشاري والحلول القانونية"}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 3.7. SOCIAL CHANNEL AUTOMATION (وكيل واتساب وفيسبوك) */}
+            {activeTool === "social-channel" && (
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm animate-fade-in">
+                <div className="border-b border-slate-100 pb-2 flex items-center justify-between">
+                  <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                    <MessageCircle className="w-4 h-4 text-emerald-600" />
+                    <span>وكيل الرد التلقائي على رسائل واتساب وفيسبوك</span>
+                  </h3>
+                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full">
+                    متاح 24/7
+                  </span>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAssistantSocialPlatform("whatsapp")}
+                    className={`flex-1 py-2 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer ${
+                      assistantSocialPlatform === "whatsapp"
+                        ? "bg-emerald-600 text-white border-emerald-500 shadow-sm"
+                        : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    <span>واتساب (WhatsApp)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAssistantSocialPlatform("facebook")}
+                    className={`flex-1 py-2 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer ${
+                      assistantSocialPlatform === "facebook"
+                        ? "bg-blue-600 text-white border-blue-500 shadow-sm"
+                        : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    <span>فيسبوك مسنجر (Facebook)</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">اسم العميل السائل:</label>
+                    <input
+                      type="text"
+                      value={assistantSocialSender}
+                      onChange={(e) => setAssistantSocialSender(e.target.value)}
+                      placeholder="اسم العميل"
+                      className="w-full bg-slate-50 text-slate-900 p-2 border border-slate-200 rounded text-right outline-none focus:bg-white focus:border-amber-500 transition text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">رقم الهاتف / المعرف:</label>
+                    <input
+                      type="text"
+                      value={assistantSocialPhone}
+                      onChange={(e) => setAssistantSocialPhone(e.target.value)}
+                      placeholder="01012345678"
+                      className="w-full bg-slate-50 text-slate-900 p-2 border border-slate-200 rounded text-right outline-none focus:bg-white focus:border-amber-500 transition text-xs font-mono"
+                      dir="ltr"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold text-xs mb-1">نص الاستفسار الوارد من العميل:</label>
+                  <textarea
+                    rows={3}
+                    value={assistantSocialMsg}
+                    onChange={(e) => setAssistantSocialMsg(e.target.value)}
+                    placeholder="الصق رسالة العميل الواردة هنا..."
+                    className="w-full p-3 bg-slate-50 text-slate-900 border border-slate-200 rounded text-right text-xs outline-none focus:bg-white focus:border-amber-500 transition leading-relaxed font-sans"
+                  />
+                </div>
+
+                <div className="flex flex-wrap gap-2 justify-between items-center pt-1">
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const clean = assistantSocialPhone.replace(/\D/g, "");
+                        const ph = clean.startsWith("0") ? `2${clean}` : clean;
+                        window.open(`https://wa.me/${ph}?text=${encodeURIComponent(aiOutput || assistantSocialMsg)}`, "_blank");
+                      }}
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>فتح واتساب ويب</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(aiOutput);
+                        alert("تم نسخ الرد لفيسبوك مسنجر بنجاح!");
+                      }}
+                      className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>نسخ لفيسبوك</span>
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={handleGenerateSocialReply}
+                    disabled={isGenerating}
+                    className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 disabled:opacity-50 text-slate-950 font-black text-xs rounded-xl cursor-pointer transition shadow-md flex items-center gap-2"
+                  >
+                    <Sparkles className={`w-4 h-4 ${isGenerating ? "animate-spin" : ""}`} />
+                    <span>{isGenerating ? "جاري صياغة الرد الآلي..." : "توليد الرد الآلي المعتمد"}</span>
                   </button>
                 </div>
               </div>

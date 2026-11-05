@@ -104,8 +104,6 @@ export default function AddClientWizardModal({
   existingCasesCount,
   initialLeadData
 }: AddClientWizardModalProps) {
-  if (!isOpen) return null;
-
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
 
   // Auto-generated Unique Codes
@@ -136,6 +134,11 @@ export default function AddClientWizardModal({
   const [whatsappCountryCode, setWhatsappCountryCode] = useState("+20");
   const [whatsappPhone, setWhatsappPhone] = useState("");
   const [facebookUrl, setFacebookUrl] = useState("");
+
+  // Client Credentials & Password Setup
+  const [customPassword, setCustomPassword] = useState("Client@2026");
+  const [phoneVerified, setPhoneVerified] = useState(true);
+  const [showPasswordText, setShowPasswordText] = useState(false);
 
   // Power of Attorney (التوكيل)
   const [poaNumber, setPoaNumber] = useState("");
@@ -350,7 +353,8 @@ export default function AddClientWizardModal({
       facebook: facebook || facebookUrl || undefined,
       useSamePhoneForWhatsapp: samePhoneForWhatsapp,
       address: address || undefined,
-      password: autoPassword,
+      password: customPassword || autoPassword,
+      phoneVerified: phoneVerified,
       email: gmail || undefined,
             linkedin: linkedin || undefined,
       gmail: gmail || undefined,
@@ -399,6 +403,8 @@ export default function AddClientWizardModal({
     onSaveClient(client, firstCaseRecord);
     onClose();
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto font-sans text-right" dir="rtl">
@@ -733,6 +739,58 @@ export default function AddClientWizardModal({
                     className="w-full p-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-sans focus:ring-2 focus:ring-amber-500 focus:outline-none text-left dir-ltr"
                   />
                 </div>
+              </div>
+
+              {/* LOGIN CREDENTIALS & PASSWORD SETUP */}
+              <div className="bg-gradient-to-r from-amber-500/10 via-slate-50 to-slate-100 dark:from-amber-500/10 dark:via-slate-800 dark:to-slate-900 p-4 rounded-2xl border-2 border-amber-500/30 space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <Lock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                    <span className="text-xs font-black text-slate-900 dark:text-slate-100">
+                      تعيين كلمة المرور لتسجيل الدخول برقم الهاتف للموكل:
+                    </span>
+                  </div>
+                  <label className="flex items-center gap-1.5 text-[11px] font-black text-emerald-600 dark:text-emerald-400 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={phoneVerified}
+                      onChange={(e) => setPhoneVerified(e.target.checked)}
+                      className="w-3.5 h-3.5 text-emerald-600 rounded"
+                    />
+                    <span>تم تأكيد رقم الهاتف (SMS / OTP)</span>
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type={showPasswordText ? "text" : "password"}
+                    value={customPassword}
+                    onChange={(e) => setCustomPassword(e.target.value)}
+                    placeholder="كلمة السر الخاصة بالموكل"
+                    className="flex-1 p-2.5 rounded-xl text-xs bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 font-mono font-bold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                    dir="ltr"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswordText(!showPasswordText)}
+                    className="px-3 py-2.5 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition hover:bg-slate-300 cursor-pointer"
+                  >
+                    {showPasswordText ? "إخفاء" : "إظهار"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const rand = "Cl#" + Math.floor(1000 + Math.random() * 9000);
+                      setCustomPassword(rand);
+                    }}
+                    className="px-3 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-black transition cursor-pointer"
+                  >
+                    توليد كلمة سر
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                  سيتمكن هذا الموكل أو العميل من تسجيل الدخول إلى بوابته الخاصة لمتابعة قضاياه وجلساته ومستنداته باستخدام رقم هاتفه وكلمة السر المحددة هنا.
+                </p>
               </div>
 
               {/* POWER OF ATTORNEY (بيانات التوكيل والمكتب) */}

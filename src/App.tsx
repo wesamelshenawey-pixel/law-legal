@@ -46,6 +46,7 @@ import AdminWorkView from "./components/AdminWorkView";
 import LawCodesView from "./components/LawCodesView";
 import SettingsView from "./components/SettingsView";
 import SocialHubView from "./components/SocialHubView";
+import CommunicationsCenterView from "./components/CommunicationsCenterView";
 import TenantsAdminView from "./components/TenantsAdminView";
 import AnnouncementsView from "./components/AnnouncementsView";
 import AnnouncementTicker from "./components/AnnouncementTicker";
@@ -63,9 +64,15 @@ import UrgentFollowUpView from "./components/UrgentFollowUpView";
 import LegalTemplatesView from "./components/LegalTemplatesView";
 import AttachmentsView from "./components/AttachmentsView";
 import OfficeServicesView from "./components/OfficeServicesView";
+import ContactsView from "./components/ContactsView";
 import LegalAiAnalysisView from "./components/LegalAiAnalysisView";
 import EgyptianLawyerAiView from "./components/EgyptianLawyerAiView";
+import LegalAiChatbotWidget from "./components/LegalAiChatbotWidget";
+import AutonomousAiAgentsHub from "./components/AutonomousAiAgentsHub";
 import SmartNotificationsView from "./components/SmartNotificationsView";
+import { SystemStructuresExpansionView } from "./components/SystemStructuresExpansionView";
+import CustomSectionWorkspaceView from "./components/CustomSectionWorkspaceView";
+import ClientFeeDetailsModal from "./components/ClientFeeDetailsModal";
 import { buildConfirmationLink } from "./utils/workspaceService";
 import { UserDesignPreferences, DEFAULT_DESIGN_PREFERENCES, DESIGN_PRESETS } from "./utils/themePresets";
 import { SidebarDisplayMode } from "./components/Sidebar";
@@ -92,8 +99,12 @@ import {
   WifiOff,
   Bell,
   BellRing,
-  BellOff
+  BellOff,
+  QrCode,
+  Globe,
+  DollarSign
 } from "lucide-react";
+import QRCode from "react-qr-code";
 
 import { 
   registerServiceWorker, 
@@ -308,6 +319,8 @@ export default function App() {
     ];
   });
 
+  const [feeModalTarget, setFeeModalTarget] = useState<{ client: ClientProfile; caseRecord?: CaseRecord } | null>(null);
+
   const [lawCodes, setLawCodes] = useState<LawCodeBook[]>(() => {
     const saved = localStorage.getItem("law_codes");
     return saved ? JSON.parse(saved) : INITIAL_LAW_CODES;
@@ -395,6 +408,7 @@ export default function App() {
   });
 
   const [isClientNoteModalOpen, setIsClientNoteModalOpen] = useState(false);
+  const [isClientQrModalOpen, setIsClientQrModalOpen] = useState(false);
   const [isDocumentManagerOpen, setIsDocumentManagerOpen] = useState(false);
   const [isPhoneSyncOpen, setIsPhoneSyncOpen] = useState(false);
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
@@ -1533,11 +1547,80 @@ export default function App() {
   };
 
   // ----------------------------------------------------
+  // GRANULAR ROLE-BASED ACCESS CONTROL (RBAC) DATA FILTERS
+  // Admin: full control
+  // Lawyer: manage cases, clients, sessions, legal memos
+  // Clerk: assist with administrative tasks, police records, sessions
+  // Client: strictly isolated to their own cases, sessions, notes, and can upload documents
+  // ----------------------------------------------------
+  const isClientRole = currentUser?.role === UserRole.CLIENT;
+  const isClerkRole = currentUser?.role === UserRole.CLERK;
+  const isLawyerRole = currentUser?.role === UserRole.LAWYER || currentUser?.role === UserRole.SENIOR_LAWYER || currentUser?.role === UserRole.ASSOCIATE_LAWYER;
+
+  const accessibleCases = React.useMemo(() => {
+    if (!currentUser) return [];
+    if (!isClientRole) return cases;
+    return cases.filter(c => 
+      (c.clientName && currentUser.name && c.clientName.trim().toLowerCase() === currentUser.name.trim().toLowerCase()) ||
+      (c.clientPhone && currentUser.phone && c.clientPhone.replace(/\D/g, '') === currentUser.phone.replace(/\D/g, ''))
+    );
+  }, [cases, currentUser, isClientRole]);
+
+  const accessibleCaseIds = React.useMemo(() => new Set(accessibleCases.map(c => c.id)), [accessibleCases]);
+
+  const accessibleSessions = React.useMemo(() => {
+    if (!currentUser) return [];
+    if (!isClientRole) return sessions;
+    return sessions.filter(s => 
+      accessibleCaseIds.has(s.caseId) ||
+      (s.clientName && currentUser.name && s.clientName.trim().toLowerCase() === currentUser.name.trim().toLowerCase())
+    );
+  }, [sessions, accessibleCaseIds, currentUser, isClientRole]);
+
+  const accessibleClients = React.useMemo(() => {
+    if (!currentUser) return [];
+    if (!isClientRole) return clients;
+    return clients.filter(c => 
+      (currentUser.name && c.name.trim().toLowerCase() === currentUser.name.trim().toLowerCase()) ||
+      (currentUser.phone && c.phone && c.phone.replace(/\D/g, '') === currentUser.phone.replace(/\D/g, ''))
+    );
+  }, [clients, currentUser, isClientRole]);
+
+  // ----------------------------------------------------
   // ROUTING VIEWS RENDERER
   // ----------------------------------------------------
   const renderActiveView = () => {
     switch (activeSection) {
+      case "contacts":
+        return (
+          <ContactsView
+            currentUser={currentUser!}
+            clients={clients}
+            opponents={opponents}
+            cases={cases}
+            onAddClient={handleAddClient}
+            onNavigate={(sec, extra) => {
+              if (extra && extra.caseId) {
+                setDefaultSelectCaseId(extra.caseId);
+              }
+              setActiveSection(sec);
+            }}
+            language={language}
+          />
+        );
+      case "archive":
+      case "attachments":
+        return (
+          <AttachmentsView
+            cases={accessibleCases}
+            clients={accessibleClients}
+            currentUser={currentUser!}
+            onNavigateToOcr={() => setActiveSection("smart_ocr")}
+            language={language}
+          />
+        );
       case "legal_ai_analysis":
+      case "legal_analysis":
         return (
           <LegalAiAnalysisView
             cases={cases}
@@ -1546,6 +1629,7 @@ export default function App() {
           />
         );
       case "smart_notifications":
+      case "notifications":
         return (
           <SmartNotificationsView
             cases={cases}
@@ -1606,22 +1690,12 @@ export default function App() {
             language={language}
           />
         );
-      case "attachments":
-        return (
-          <AttachmentsView
-            cases={cases}
-            clients={clients}
-            currentUser={currentUser!}
-            onNavigateToOcr={() => setActiveSection("smart_ocr")}
-            language={language}
-          />
-        );
       case "dashboard":
         return (
           <DashboardView 
-            cases={cases}
-            clients={clients}
-            sessions={sessions}
+            cases={accessibleCases}
+            clients={accessibleClients}
+            sessions={accessibleSessions}
             leads={leads}
             fees={fees}
             clientNotes={clientNotes}
@@ -1644,11 +1718,11 @@ export default function App() {
       case "sessions":
         return (
           <SessionsView 
-            sessions={sessions}
+            sessions={accessibleSessions}
             onUpdateSessionStatus={handleUpdateSessionStatus}
             currentUser={currentUser!}
-            cases={cases}
-            clients={clients}
+            cases={accessibleCases}
+            clients={accessibleClients}
             fees={fees}
             onAddFeePayment={handleAddFeeTransfer}
             onAddSession={(newSess) => setSessions(prev => [newSess, ...prev])}
@@ -1657,8 +1731,8 @@ export default function App() {
       case "cases":
         return (
           <CasesView 
-            cases={cases}
-            clients={clients}
+            cases={accessibleCases}
+            clients={accessibleClients}
             opponents={opponents}
             onAddCase={handleAddCase}
             onAddCourt={(ct) => setCourtsList(prev => [...prev, ct])}
@@ -1678,12 +1752,13 @@ export default function App() {
               setIsDocumentManagerOpen(true);
             }}
             onNavigateToOcr={() => setActiveSection("smart_ocr")}
+            onOpenFeeDetails={(cl, cs) => setFeeModalTarget({ client: cl, caseRecord: cs })}
           />
         );
       case "clients":
         return (
           <ClientsView 
-            clients={clients}
+            clients={accessibleClients}
             opponents={opponents}
             leads={leads}
             fees={fees}
@@ -1695,6 +1770,8 @@ export default function App() {
             onImportLeads={handleImportLeads}
             onUpdateClient={handleUpdateClient}
             currentUser={currentUser!}
+            language={language}
+            onOpenFeeDetails={(cl) => setFeeModalTarget({ client: cl })}
             onOpenPhoneSync={() => setIsPhoneSyncOpen(true)}
             onOpenDocumentManager={(sec, lbl) => {
               setDocumentManagerSection(sec);
@@ -1712,10 +1789,16 @@ export default function App() {
             currentUser={currentUser!}
           />
         );
+      case "ai_agents_hub":
       case "ai":
         return (
-          <AiAssistantView 
+          <AutonomousAiAgentsHub
             currentUser={currentUser!}
+            cases={cases}
+            clients={clients}
+            lawCodes={lawCodes}
+            onNavigate={(sec) => setActiveSection(sec)}
+            language={language}
           />
         );
       case "egyptian_lawyer_ai":
@@ -1747,6 +1830,12 @@ export default function App() {
             currentUser={currentUser!}
             clients={clients}
             onUpdateClient={handleUpdateClient}
+          />
+        );
+      case "communications":
+        return (
+          <CommunicationsCenterView 
+            clients={clients}
           />
         );
       case "doc_editor":
@@ -1832,6 +1921,8 @@ export default function App() {
             onAddClient={handleAddClient}
             onAddCase={handleAddCase}
             clients={clients}
+            cases={cases}
+            sessions={sessions}
             language={language}
             onOpenDocumentManager={(sec, lbl) => {
               setDocumentManagerSection(sec);
@@ -1863,18 +1954,63 @@ export default function App() {
             initialTab="keep"
           />
         );
+      case "system_structures":
+        return (
+          <SystemStructuresExpansionView
+            currentUser={currentUser!}
+            language={language}
+            onNavigateToSection={(secId) => setActiveSection(secId)}
+            onAddSectionToApp={(newSec) => {
+              const secItem: AdminCustomSection = {
+                id: newSec.id,
+                nameArabic: newSec.nameArabic,
+                nameEnglish: newSec.nameEnglish || newSec.id,
+                iconName: newSec.iconName || "Layers",
+                path: `/${newSec.id}`,
+                fields: newSec.fields || [
+                  { name: "العنوان / الموضوع", type: "string" },
+                  { name: "التاريخ", type: "date" },
+                  { name: "الحالة", type: "string" },
+                  { name: "ملاحظات", type: "string" }
+                ],
+                records: newSec.records || []
+              };
+              setCustomSections(prev => {
+                if (prev.some(s => s.id === secItem.id)) return prev;
+                const next = [secItem, ...prev];
+                localStorage.setItem("law_customSections", JSON.stringify(next));
+                return next;
+              });
+            }}
+          />
+        );
+      case "tenants_admin":
+        return (
+          <TenantsAdminView
+            currentUser={currentUser!}
+            language={language}
+          />
+        );
       default:
         const targetDyn = customSections.find(s => s.id === activeSection);
         if (targetDyn) {
           return (
-            <div className="bg-slate-900 p-6 rounded-xl border border-slate-800 text-right space-y-4 font-sans text-xs">
-              <h2 className="text-xl font-bold text-amber-400">{targetDyn.nameArabic}</h2>
-              <p className="text-slate-400">قسم إلكتروني تم استحداثه تلقائياً بواسطة الأستاذ وسام الشناوي.</p>
-              
-              <div className="p-12 text-center text-slate-500 bg-slate-950 rounded-lg animate-pulse">
-                تم دمج وهندسة القسم بالكامل. يمكنك البدء باستخدام خاصية المزامنة السحابية لإدراج المدخلات.
-              </div>
-            </div>
+            <CustomSectionWorkspaceView
+              section={targetDyn}
+              currentUser={currentUser!}
+              language={language}
+              onUpdateSection={(updated) => {
+                setCustomSections(prev => {
+                  const next = prev.map(s => s.id === updated.id ? updated : s);
+                  localStorage.setItem("law_customSections", JSON.stringify(next));
+                  return next;
+                });
+              }}
+              onRemoveSection={(secId) => {
+                handleRemoveCustomSection(secId);
+                setActiveSection("dashboard");
+              }}
+            />
           );
         }
         return <div className="text-center py-12">القسم غير متوفر</div>;
@@ -1956,7 +2092,7 @@ export default function App() {
     <>
       <style>{accentStyles}</style>
       <div className={`min-h-screen flex flex-col md:flex-row relative transition-colors duration-300 ${
-      isDarkMode ? "bg-[#111910] text-[#ecf3eb]" : "bg-[#f2f6ed] text-[#1c2a1b]"
+      isDarkMode ? "bg-[#0b1320] text-[#ecf3eb]" : "bg-slate-900 text-slate-100"
     }`} dir={language === "ar" ? "rtl" : "ltr"}>
       
       {/* Floating User Profile Avatar in Top Left Corner */}
@@ -1974,13 +2110,13 @@ export default function App() {
       
       {/* Global Public Announcement & Advertising Ticker (Centered Header) */}
       <div 
-        className={`fixed top-4 z-40 transition-all duration-300 flex justify-center ${
+        className={`fixed top-2 z-40 transition-all duration-300 flex justify-center px-2 pointer-events-none ${
           language === "ar"
-            ? currentUser.role !== UserRole.CLIENT && sidebarMode === "full" ? "right-[330px] left-16 md:left-20" : currentUser.role !== UserRole.CLIENT && sidebarMode === "emoji" ? "right-[90px] left-16 md:left-20" : "right-16 md:right-20 left-16 md:left-20"
-            : currentUser.role !== UserRole.CLIENT && sidebarMode === "full" ? "left-[330px] right-16 md:right-20" : currentUser.role !== UserRole.CLIENT && sidebarMode === "emoji" ? "left-[90px] right-16 md:right-20" : "left-16 md:left-20 right-16 md:right-20"
+            ? currentUser.role !== UserRole.CLIENT && sidebarMode === "full" ? "right-2 md:right-[285px] left-14 md:left-20" : currentUser.role !== UserRole.CLIENT && sidebarMode === "emoji" ? "right-2 md:right-[78px] left-14 md:left-20" : "right-12 sm:right-16 md:right-20 left-12 sm:left-16 md:left-20"
+            : currentUser.role !== UserRole.CLIENT && sidebarMode === "full" ? "left-2 md:left-[285px] right-14 md:right-20" : currentUser.role !== UserRole.CLIENT && sidebarMode === "emoji" ? "left-2 md:left-[78px] right-14 md:right-20" : "left-12 sm:left-16 md:left-20 right-12 sm:right-16 md:right-20"
         }`}
       >
-        <div className="w-full max-w-4xl">
+        <div className="w-full max-w-4xl pointer-events-auto">
           <AnnouncementTicker
             announcements={announcements}
             onNavigateToAnnouncements={() => setActiveSection("announcements")}
@@ -2002,58 +2138,38 @@ export default function App() {
         sidebarMode={sidebarMode}
         setSidebarMode={setSidebarMode}
       />}
-      {/* Main Container with Dynamic Margins and 2cm lowered top offset for desktop and mobile */}
+      {/* Main Container with Streamlined Responsive Padding & Tight Sidebar Gap */}
       <main 
-        className={`flex-1 p-3.5 sm:p-6 lg:p-8 pt-[calc(4.5rem+2cm)] sm:pt-[calc(5rem+2cm)] md:pt-[calc(5.5rem+2cm)] pb-16 overflow-y-auto max-h-screen transition-all duration-300 ${
+        className={`flex-1 p-2 sm:p-3 lg:p-4 pt-14 sm:pt-16 md:pt-16 pb-8 overflow-y-auto min-h-screen transition-all duration-300 ${
           language === "ar"
             ? currentUser.role !== UserRole.CLIENT && sidebarMode === "full"
-              ? "md:mr-[320px]"
+              ? "md:mr-[285px]"
               : currentUser.role !== UserRole.CLIENT && sidebarMode === "emoji"
-              ? "md:mr-[80px]"
+              ? "md:mr-[78px]"
               : "mr-0"
             : currentUser.role !== UserRole.CLIENT && sidebarMode === "full"
-              ? "md:ml-[320px]"
+              ? "md:ml-[285px]"
               : currentUser.role !== UserRole.CLIENT && sidebarMode === "emoji"
-              ? "md:ml-[80px]"
+              ? "md:ml-[78px]"
               : "ml-0"
         }`}
       >
-        {/* Global Public Announcement & Advertising Ticker (Always Visible at Top for All Users) */}
-        
-
-        {/* Top Header Bar with Dropdown Menus */}
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-emerald-900/10 dark:border-emerald-500/10">
-          
-          {/* Breadcrumb / Title */}
-          <div className="flex items-center gap-3">
-            <div>
-              <span className="text-[12px] font-black text-amber-700 dark:text-amber-400 block tracking-wide">
-                {language === "ar" ? "ديوان المحاماة الرقمي المتطور" : "Advanced Legal Office Portal"}
-              </span>
-              <h1 className="text-base md:text-xl font-black text-slate-950 dark:text-white tracking-tight">
-                {activeSection === "dashboard" && (language === "ar" ? "لوحة المتابعة الشاملة" : "Dashboard")}
-                {activeSection === "office_services" && (language === "ar" ? "قائمة الخدمات القانونية والإدارية الشاملة" : "Comprehensive Legal Services")}
-                {activeSection === "cases" && (language === "ar" ? "إدارة القضايا والدعاوى" : "Cases & Court Files")}
-                {activeSection === "clients" && (language === "ar" ? "سجل الموكلين وجهات الاتصال" : "Clients & Contacts")}
-                {activeSection === "sessions" && (language === "ar" ? "أجندة الجلسات اليومية" : "Court Sessions Agenda")}
-                {activeSection === "fees" && (language === "ar" ? "الخزينة والأتعاب" : "Treasury & Fees")}
-                {activeSection === "ai" && (language === "ar" ? "المستشار الذكي" : "AI Legal Assistant")}
-                {activeSection === "doc_editor" && (language === "ar" ? "محرر المستندات والصياغة القضائية" : "Advanced Document Editor")}
-                {activeSection === "smart_ocr" && (language === "ar" ? "الفحص واستخراج النصوص (Smart OCR)" : "Smart OCR Studio")}
-                {activeSection === "lawcodes" && (language === "ar" ? "المكتبة والأكواد القضائية" : "Law Codes Library")}
-                {activeSection === "social" && (language === "ar" ? "ديوان التواصل والاستشارات" : "Social & Interactive Hub")}
-                {activeSection === "announcements" && (language === "ar" ? "شريط الإعلانات والتعميمات القضائية" : "Public Announcements & Legal Bulletins")}
-                {activeSection === "import_files" && (language === "ar" ? "استيراد وإدارة الملفات" : "Import Files")}
-                {activeSection === "keep" && (language === "ar" ? "ملاحظات ومذكرات Google Keep القضائية" : "Google Keep Legal Notes")}
-                {activeSection === "workspace" && (language === "ar" ? "منظومة Google Workspace السحابية" : "Google Workspace Cloud")}
-                {activeSection === "settings" && (language === "ar" ? "إعدادات النظام والترخيص" : "Settings & Licenses")}
-                {activeSection === "tenants_admin" && (language === "ar" ? "إدارة المكاتب والمشتركين" : "Tenants Admin")}
-              </h1>
-            </div>
-          </div>
-
-          {/* Top Header Actions (Search Bar, Notifications, & Offline Sync Status Indicator) */}
+        {/* Top Header Bar with Dropdown Menus and Controls (Compact) */}
+        <div className="mb-2.5 flex flex-wrap items-center justify-end gap-2.5 pb-1.5 border-b border-slate-700/40">
+          {/* Top Header Actions (Language Toggle, Search Bar, Notifications, & Offline Sync Status Indicator) */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 relative">
+            {/* Bilingual Language Switcher Toggle */}
+            <button
+              id="top-language-toggle-btn"
+              type="button"
+              onClick={() => setLanguage(language === "ar" ? "en" : "ar")}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-black transition-all shadow-xs cursor-pointer active:scale-95 bg-amber-500/15 border-amber-500/40 text-amber-900 dark:text-amber-300 hover:bg-amber-500/25"
+              title={language === "ar" ? "Switch interface to English (🇬🇧 English)" : "التحويل للغة العربية (🇪🇬 العربية)"}
+            >
+              <Globe className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              <span>{language === "ar" ? "🇬🇧 English" : "🇪🇬 العربية"}</span>
+            </button>
+
             {/* Browser Push Notifications Quick Toggle */}
             <button
               type="button"
@@ -2165,38 +2281,83 @@ export default function App() {
               </p>
             </div>
             
-            <button
-              id="client-leave-note"
-              style={{ position: 'relative', overflow: 'hidden' }}
-              onClick={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-                const id = Date.now();
-                setButtonRipples((prev) => [...prev, { x, y, id }]);
+            <div className="flex gap-2">
+              <button
+                onClick={() => setIsClientQrModalOpen(true)}
+                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-amber-500 font-bold rounded-xl text-xs transition duration-200 shadow-md cursor-pointer flex items-center justify-center gap-1.5"
+                title="عرض رمز الاستجابة السريعة (QR Code) لتسجيل الدخول السريع بالاستقبال"
+              >
+                <QrCode className="w-4 h-4" />
+                <span>QR بطاقة دخول</span>
+              </button>
+
+              <button
+                id="client-leave-note"
+                style={{ position: 'relative', overflow: 'hidden' }}
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = e.clientX - rect.left;
+                  const y = e.clientY - rect.top;
+                  const id = Date.now();
+                  setButtonRipples((prev) => [...prev, { x, y, id }]);
+                  
+                  setIsClientNoteModalOpen(true);
+                }}
+                className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs transition duration-200 shadow-md cursor-pointer transform hover:scale-105 active:scale-95 flex items-center justify-center gap-1.5"
+              >
+                <span>{language === "ar" ? "✍️ ترك ملحوظة للأستاذ وسام" : "Message Advocate Wesam"}</span>
                 
-                setIsClientNoteModalOpen(true);
-              }}
-              className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs transition duration-200 shadow-md cursor-pointer transform hover:scale-105 active:scale-95 flex items-center justify-center gap-1.5"
-            >
-              <span>{language === "ar" ? "✍️ ترك ملحوظة للأستاذ وسام" : "Message Advocate Wesam"}</span>
+                {buttonRipples.map((ripple) => (
+                  <span
+                    key={ripple.id}
+                    onAnimationEnd={() => {
+                      setButtonRipples((prev) => prev.filter((r) => r.id !== ripple.id));
+                    }}
+                    className="absolute bg-white/40 rounded-full pointer-events-none animate-ripple"
+                    style={{
+                      left: ripple.x - 20,
+                      top: ripple.y - 20,
+                      width: 40,
+                      height: 40,
+                    }}
+                  />
+                ))}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* QR CODE DISPLAY MODAL */}
+        {isClientQrModalOpen && (
+          <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in font-sans" dir={language === "ar" ? "rtl" : "ltr"}>
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 w-full max-w-sm overflow-hidden shadow-2xl animate-scale-up text-center relative p-8">
+              <button 
+                onClick={() => setIsClientQrModalOpen(false)}
+                className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 w-8 h-8 flex items-center justify-center rounded-full transition cursor-pointer bg-slate-100 dark:bg-slate-800"
+              >
+                ×
+              </button>
               
-              {buttonRipples.map((ripple) => (
-                <span
-                  key={ripple.id}
-                  onAnimationEnd={() => {
-                    setButtonRipples((prev) => prev.filter((r) => r.id !== ripple.id));
-                  }}
-                  className="absolute bg-white/40 rounded-full pointer-events-none animate-ripple"
-                  style={{
-                    left: ripple.x - 20,
-                    top: ripple.y - 20,
-                    width: 40,
-                    height: 40,
-                  }}
-                />
-              ))}
-            </button>
+              <div className="mb-6 flex flex-col items-center">
+                <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center mb-4">
+                  <QrCode className="w-8 h-8 text-amber-600 dark:text-amber-500" />
+                </div>
+                <h3 className="text-xl font-black text-slate-900 dark:text-slate-100">
+                  {language === "ar" ? "بطاقة الوصول السريع" : "Quick Access Pass"}
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 max-w-[200px] mx-auto">
+                  {language === "ar" ? "قم بإبراز هذا الرمز لموظف الاستقبال لتسجيل حضورك فوراً." : "Show this QR code to the receptionist for instant check-in."}
+                </p>
+              </div>
+
+              <div className="bg-white p-4 rounded-xl inline-block mx-auto border-4 border-amber-500/20 shadow-inner">
+                <QRCode value={`CLIENT_ID:${currentUser.id}`} size={200} level="H" />
+              </div>
+              
+              <div className="mt-6 text-[10px] font-bold text-slate-400 font-mono">
+                ID: {currentUser.id}
+              </div>
+            </div>
           </div>
         )}
 
@@ -3125,13 +3286,22 @@ export default function App() {
         </div>
 
         {currentUser && (
-        <AiVoiceAssistantLauncher
-          onOpenAiAssistant={() => setActiveSection("ai")}
-          onOpenLegalAnalysis={() => setActiveSection("legal_analysis")}
-          onOpenSmartOcr={() => setActiveSection("smart_ocr")}
-          language={language}
-        />
-      )}
+          <>
+            <AiVoiceAssistantLauncher
+              onOpenAiAssistant={() => setActiveSection("ai")}
+              onOpenLegalAnalysis={() => setActiveSection("legal_analysis")}
+              onOpenSmartOcr={() => setActiveSection("smart_ocr")}
+              language={language}
+            />
+            <LegalAiChatbotWidget
+              currentUser={currentUser}
+              language={language}
+              onNavigateSection={(sec) => setActiveSection(sec)}
+              lawCodes={lawCodes}
+            />
+          </>
+        )}
+
       </main>
 
       {/* Global Comprehensive Search Modal Engine (Cases, Documents, Clients, Sessions, Fees, Law Codes) */}
@@ -3152,6 +3322,28 @@ export default function App() {
           }
           setActiveSection(section);
         }}
+      />
+
+      {/* Global Client & Case Detailed Fee Information & Printable Invoice Modal */}
+      <ClientFeeDetailsModal
+        isOpen={!!feeModalTarget}
+        onClose={() => setFeeModalTarget(null)}
+        client={feeModalTarget?.client || null}
+        caseRecord={feeModalTarget?.caseRecord || null}
+        fees={fees}
+        onAddPayment={(newFee) => {
+          setFees(prev => [newFee, ...prev]);
+          try {
+            const savedFees = localStorage.getItem("law_fees");
+            const list = savedFees ? JSON.parse(savedFees) : [];
+            localStorage.setItem("law_fees", JSON.stringify([newFee, ...list]));
+          } catch (e) {
+            console.error(e);
+          }
+        }}
+        language={language}
+        currentUser={currentUser!}
+        allCases={cases}
       />
 
       {/* Floating Toast Alerts for Court Sessions */}

@@ -1,22 +1,35 @@
-# Development notes
+# AGENTS.md — sandbox / Base44 notes
 
-## Running the app
+## Stack
+- Single Node/Express process (`server.ts`) that runs **Vite in middleware mode** in development and serves `dist/` in production. One entry point on port 3000 — no separate client/API servers.
+- Vite root is the repository root (`@` alias → repo root), so components live in `src/`.
+- Local dev command: `npm run dev` (`tsx server.ts`). Production build: `npm run build` (`vite build` + esbuild-bundled `server.ts` → `dist/server.cjs`).
 
+## Run it in the sandbox
 ```bash
 docker compose -f docker-compose.base44.yml up -d --build
+docker compose -f docker-compose.base44.yml logs -f web
 ```
+- `node:22-bookworm-slim` + source bind-mounted; `node_modules` lives in a named volume and is installed from `package-lock.json` (`npm ci`) at container start.
+- The container runs the dev server, not the production build, so edits hot-reload through Vite HMR. Changes to `server.ts` require `docker compose restart web` (`tsx` is not started in watch mode).
 
-- Single Node service (`node:22`) runs `tsx server.ts` in dev mode; Express serves the API routes and mounts Vite in middleware mode for the React SPA on port 3000.
-- `node_modules` lives in a named Docker volume, populated by `npm install` at container start. Do not delete the volume to refresh deps; use `docker compose ... exec app npm install <pkg>`.
-- Vite's dev-server host allowlist receives `__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS` from the platform environment (passed through as a bare env entry) — required for the sandbox preview host.
-- `docker/startup.sh` is the container entrypoint (runs as root). It validates env vars before the app starts: missing `REQUIRED_VARS` abort with exit 1; missing `RECOMMENDED_VARS` (currently `GEMINI_API_KEY`) print a warning and the app still starts.
+## Environment check
+- `docker/startup.sh` is the container entrypoint (Compose runs it as root via `user: root`). It runs before `npm ci` and `npm run dev`.
+- Missing `REQUIRED_VARS` print a "STARTUP ABORTED" block and exit 1. `REQUIRED_VARS` is empty today because `server.ts` falls back to defaults for every variable it reads.
+- Missing `RECOMMENDED_VARS` (currently `GEMINI_API_KEY`) print a warning only: the app starts, but AI chat/OCR/drafting stay disabled.
+- Override the lists for one-off checks: `docker compose -f docker-compose.base44.yml exec -T -e REQUIRED_VARS=GEMINI_API_KEY web /app/docker/startup.sh true`.
+- `tests/startup-env-check.sh` verifies the abort/pass/warning paths, the executable bit and that Compose runs the container as root.
 
-## Secrets
+## Gotchas learned the hard way
+- **`package-lock.json` and `package.json` must stay in sync.** A commit once trimmed the lockfile and dropped `react-qr-code` from `package.json` while the source imported it — `npm ci` aborted with `Missing: <pkg> from lock file`, then the dev server failed on `Failed to resolve import`. If `npm ci` reports missing packages, regenerate with `npm install --package-lock-only` and commit the result.
+- `bun.lock` is present but stale/not used by Compose or CI; never treat it as the source of truth for dependencies.
+- `.env.base44-defaults` holds boot-only placeholders; `/run/base44/app.env` (platform secrets) is listed after it so real values win. Never put real credentials in the defaults file.
+- Preview proxy hosts are passed bare through Compose (`__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS`) so Vite accepts them; no host is hardcoded.
+- `dist/` and `build/` are **not** gitignored in this repo. Running `npm run build` creates `dist/`; delete it afterwards so build output is not committed.
 
-- `GEMINI_API_KEY` is optional at boot: `server.ts` falls back to a dummy key, so the UI and non-AI features load. AI chat, document OCR and AI drafting calls fail without a real key.
-- Secrets arrive via `/run/base44/app.env` (outside the repo) and are wired through `env_file:` in compose.
-
-## Verification
-
-- `docker compose -f docker-compose.base44.yml ps` should show `app` as `healthy`; `curl -s localhost:3000` returns 200 with the login page.
-- `npm run lint` (tsc) inside the container checks types.
+## Verify
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:3000/     # expect 200
+docker compose -f docker-compose.base44.yml exec -T web npm run build # production build must pass
+```
+The app opens on a login screen (Firebase/Firestore auth). Without a signed-in session only the login screen can be verified.

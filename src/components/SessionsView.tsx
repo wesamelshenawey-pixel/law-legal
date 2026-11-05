@@ -28,8 +28,10 @@ import {
   X, 
   Send,
   Download,
-  AlertCircle
+  AlertCircle,
+  Scan
 } from "lucide-react";
+import { SectionDedicatedOcrModal } from "./SectionDedicatedOcrModal";
 
 export interface AdministrativeTask {
   id: string;
@@ -66,6 +68,7 @@ interface SessionsViewProps {
   fees?: FeeTransfer[];
   onAddFeePayment?: (fee: FeeTransfer) => void;
   onAddSession?: (newSession: SessionRecord) => void;
+  language?: "ar" | "en";
 }
 
 export default function SessionsView({ 
@@ -76,7 +79,8 @@ export default function SessionsView({
   clients = [],
   fees = [],
   onAddFeePayment,
-  onAddSession
+  onAddSession,
+  language = "ar"
 }: SessionsViewProps) {
   // View mode switcher
   const [activeTab, setActiveTab] = useState<"calendar" | "agenda" | "dashboard" | "admin_tasks" | "police_records">("calendar");
@@ -91,6 +95,13 @@ export default function SessionsView({
 
   // Calendar Navigation State
   const [currentDate, setCurrentDate] = useState(() => new Date(2026, 5, 1)); // Default June 2026
+
+  // Selected Date Sessions Modal (Clicking any date on Monthly Calendar)
+  const [dateSessionsModal, setDateSessionsModal] = useState<{
+    dateStr: string;
+    dayNum: number;
+    sessions: SessionRecord[];
+  } | null>(null);
 
   // Postponement Modal Fields
   const [nextDate, setNextDate] = useState("2026-07-15");
@@ -107,6 +118,7 @@ export default function SessionsView({
 
   // Add Session Modal
   const [showAddSessionModal, setShowAddSessionModal] = useState(false);
+  const [isSessionsOcrOpen, setIsSessionsOcrOpen] = useState(false);
   const [newCaseNumber, setNewCaseNumber] = useState("");
   const [newCaseYear, setNewCaseYear] = useState(2026);
   const [newCourt, setNewCourt] = useState("محكمة استئناف المنصورة");
@@ -279,14 +291,20 @@ export default function SessionsView({
       const dayStr = String(i).padStart(2, "0");
       const dateKey = `${year}-${monthStr}-${dayStr}`;
       const daySessions = sessions.filter(s => s.date === dateKey);
+      const dayTasks = adminTasks.filter(t => t.deadline === dateKey);
+      const morningCount = daySessions.filter(s => s.timeType === "morning" || !s.timeType).length;
+      const eveningCount = daySessions.filter(s => s.timeType === "evening").length;
       days.push({
         dayNum: i,
         dateStr: dateKey,
-        sessions: daySessions
+        sessions: daySessions,
+        tasks: dayTasks,
+        morningCount,
+        eveningCount
       });
     }
     return days;
-  }, [year, month, daysInCurrentMonth, sessions]);
+  }, [year, month, daysInCurrentMonth, sessions, adminTasks]);
 
   // Upcoming Alert Calculations
   const upcomingTodayAndTomorrow = useMemo(() => {
@@ -345,6 +363,7 @@ export default function SessionsView({
       caseId: "case-manual-" + Date.now(),
       date: newSessionDate,
       timeType: newTimeType,
+      time: newTimeType === "morning" ? "09:00 AM" : "12:00 PM",
       caseInfo: {
         caseNumber: newCaseNumber,
         caseYear: newCaseYear,
@@ -390,6 +409,16 @@ export default function SessionsView({
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           <button
+            id="btn-lexmark-ocr-sessions"
+            onClick={() => setIsSessionsOcrOpen(true)}
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-900 dark:text-amber-300 border border-amber-500/40 rounded-2xl text-xs font-black shadow-xs transition cursor-pointer active:scale-95"
+            title="مسح محضر الجلسة أو قرار التأجيل أو الرول عبر سكانر Lexmark X54de أو OCR"
+          >
+            <Scan className="w-4 h-4 text-amber-500" />
+            <span>ماسح Lexmark X54de / محضر الجلسة</span>
+          </button>
+
+          <button
             id="btn-quick-print-today"
             onClick={() => {
               setQuickPrintDateFilter("today");
@@ -422,7 +451,7 @@ export default function SessionsView({
       </div>
 
       {/* ========================================================================= */}
-      {/* 2. NAVIGATION TABS (Calendar / Agenda / Alerts Dashboard / Admin / Police) */}
+      {/* 2. NAVIGATION TABS (Merged Calendar & Agenda / Alerts Dashboard / Admin / Police) */}
       {/* ========================================================================= */}
       <div className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none] pb-1 border-b border-slate-200 dark:border-slate-800">
         <button
@@ -434,7 +463,7 @@ export default function SessionsView({
           }`}
         >
           <CalendarIcon className="w-4 h-4" />
-          <span>التقويم الشهري التفاعلي</span>
+          <span>التقويم والأجندة القضائية الموحدة (Calendar)</span>
         </button>
 
         <button
@@ -450,18 +479,6 @@ export default function SessionsView({
           {upcomingTodayAndTomorrow.today.length > 0 && (
             <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
           )}
-        </button>
-
-        <button
-          onClick={() => setActiveTab("agenda")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition cursor-pointer whitespace-nowrap ${
-            activeTab === "agenda"
-              ? "bg-amber-500 text-slate-950 shadow-md"
-              : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50"
-          }`}
-        >
-          <FileText className="w-4 h-4" />
-          <span>سرود وأجندة الجلسات اليومية ({filteredSessions.length})</span>
         </button>
 
         <button
@@ -489,8 +506,48 @@ export default function SessionsView({
         </button>
       </div>
 
+      {/* Comprehensive Notifications Alert Bar for Sessions & Tasks */}
+      <div className="p-4 rounded-3xl bg-gradient-to-r from-amber-500/15 via-red-500/10 to-purple-500/15 border-2 border-amber-500/30 flex flex-col md:flex-row items-center justify-between gap-3 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-2xl bg-amber-500 text-slate-950 font-black shrink-0 animate-pulse">
+            <AlertCircle className="w-5 h-5" />
+          </div>
+          <div>
+            <h4 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
+              <span>تنبيهات العمليات القضائية والمواعيد الإجرائية العاجلة</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] bg-red-600 text-white font-bold">
+                {upcomingTodayAndTomorrow.today.length + upcomingTodayAndTomorrow.tomorrow.length + adminTasks.filter(t => t.priority === "urgent").length} مواعيد عاجلة
+              </span>
+            </h4>
+            <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">
+              جلسات اليوم ({upcomingTodayAndTomorrow.today.length}) • جلسات الغد ({upcomingTodayAndTomorrow.tomorrow.length}) • مهام إدارية ملحة ({adminTasks.filter(t => t.priority === "urgent").length})
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+          <button
+            type="button"
+            onClick={() => {
+              setQuickPrintDateFilter("today");
+              setShowQuickPrintModal(true);
+            }}
+            className="px-3.5 py-1.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl text-xs font-bold border border-slate-300 dark:border-slate-700 hover:border-amber-500 cursor-pointer transition shadow-xs"
+          >
+            طباعة رول اليوم 🖨️
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("admin_tasks")}
+            className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-black cursor-pointer transition shadow-xs"
+          >
+            متابعة المهام الإدارية ({adminTasks.filter(t => t.status !== "completed").length})
+          </button>
+        </div>
+      </div>
+
       {/* ========================================================================= */}
-      {/* 3. TAB 1: INTERACTIVE MONTHLY CALENDAR VIEW                               */}
+      {/* 3. TAB 1: UNIFIED MONTHLY CALENDAR & INTEGRATED AGENDA VIEW               */}
       {/* ========================================================================= */}
       {activeTab === "calendar" && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -558,10 +615,16 @@ export default function SessionsView({
                   <div
                     key={d.dayNum}
                     onClick={() => {
+                      setDateSessionsModal({
+                        dateStr: d.dateStr,
+                        dayNum: d.dayNum,
+                        sessions: d.sessions
+                      });
                       if (hasSessions) {
                         setSelectedSession(d.sessions[0]);
                       }
                     }}
+                    title={`عرض تفاصيل جلسات يوم ${d.dayNum} (${d.sessions.length} جلسة)`}
                     className={`min-h-18 p-2 rounded-2xl flex flex-col justify-between items-center transition-all relative cursor-pointer outline-none border ${
                       hasSessions
                         ? "bg-amber-500/10 dark:bg-amber-500/15 border-2 border-amber-500 text-amber-950 dark:text-amber-200 font-black shadow-xs hover:scale-102 hover:shadow-md"
@@ -570,13 +633,24 @@ export default function SessionsView({
                   >
                     <span className="text-sm font-mono font-black">{d.dayNum}</span>
                     
-                    {hasSessions && (
-                      <div className="w-full text-center space-y-0.5 mt-1">
-                        <span className="px-1.5 py-0.5 rounded-md bg-amber-500 text-slate-950 text-[10px] font-black block truncate">
-                          {d.sessions.length} {d.sessions.length === 1 ? "جلسة" : "جلسات"}
+                    <div className="w-full text-center space-y-1 mt-1">
+                      {hasSessions && (
+                        <div>
+                          <span className="px-1.5 py-0.5 rounded-md bg-amber-500 text-slate-950 text-[10px] font-black block truncate">
+                            {d.sessions.length} {d.sessions.length === 1 ? "جلسة" : "جلسات"}
+                          </span>
+                          <div className="flex items-center justify-center gap-1 text-[9px] font-bold mt-0.5">
+                            {d.morningCount > 0 && <span className="text-amber-700 dark:text-amber-300">🌅 {d.morningCount}</span>}
+                            {d.eveningCount > 0 && <span className="text-blue-700 dark:text-blue-300">☀️ {d.eveningCount}</span>}
+                          </div>
+                        </div>
+                      )}
+                      {d.tasks && d.tasks.length > 0 && (
+                        <span className="px-1 py-0.5 rounded-md bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/30 text-[9px] font-bold block truncate">
+                          📋 {d.tasks.length} إداري
                         </span>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -1235,7 +1309,50 @@ export default function SessionsView({
             </div>
 
             <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">القرار / سبب التأجيل</label>
+                <textarea
+                  value={adjournmentReason}
+                  onChange={(e) => setAdjournmentReason(e.target.value)}
+                  placeholder="مثال: تأجيل للاطلاع والرد..."
+                  className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none focus:border-amber-500 min-h-[60px]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">تاريخ الجلسة القادمة (إن وُجد)</label>
+                <input
+                  type="date"
+                  value={nextDate}
+                  onChange={(e) => setNextDate(e.target.value)}
+                  className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none focus:border-amber-500 font-mono"
+                />
+              </div>
 
+              {/* Vertical Timeline of Session History */}
+              {selectedSession.history && selectedSession.history.length > 0 && (
+                <div className="mt-4 border-t border-slate-100 dark:border-slate-800 pt-4">
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white mb-3">التسلسل الزمني للجلسات السابقة</h4>
+                  <div className="space-y-4 pl-2 border-r-2 border-slate-200 dark:border-slate-700 pr-4">
+                    {selectedSession.history.map((hist, idx) => (
+                      <div key={idx} className="relative">
+                        <div className="absolute w-2.5 h-2.5 bg-amber-500 rounded-full -right-[23px] top-1 ring-4 ring-white dark:ring-slate-900"></div>
+                        <div className="bg-slate-50 dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-[10px] font-bold text-slate-500">الجلسة السابقة</span>
+                            <span className="text-[10px] font-mono font-bold text-slate-400">{hist.date}</span>
+                          </div>
+                          <p className="text-xs text-slate-700 dark:text-slate-300 font-bold mb-1">{hist.decision}</p>
+                          {hist.requiredWork && (
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                              <span className="text-amber-600 dark:text-amber-500">المطلوب: </span>{hist.requiredWork}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
@@ -1717,6 +1834,191 @@ export default function SessionsView({
           </div>
         );
       })()}
+
+      {/* ========================================================================= */}
+      {/* MODAL: SESSIONS DETAILS FOR CLICKED CALENDAR DATE                         */}
+      {/* ========================================================================= */}
+      {dateSessionsModal && (
+        <div 
+          className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 font-sans print:hidden"
+          dir="rtl"
+        >
+          <div className="bg-white dark:bg-slate-900 border-2 border-amber-500/40 rounded-3xl max-w-2xl w-full p-6 space-y-5 shadow-2xl relative max-h-[90vh] flex flex-col">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-2xl border border-amber-500/30">
+                  <CalendarIcon className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-slate-100">
+                    أجندة وجلسات يوم {dateSessionsModal.dateStr}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-bold">
+                    إجمالي الجلسات المجدولة في هذا اليوم: ({dateSessionsModal.sessions.length}) جلسة
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setDateSessionsModal(null)}
+                className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Sessions List or Empty State */}
+            <div className="flex-1 overflow-y-auto space-y-3.5 pr-1">
+              {dateSessionsModal.sessions.length === 0 ? (
+                <div className="p-8 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl space-y-4 my-4">
+                  <Clock className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-700" />
+                  <div>
+                    <h4 className="text-sm font-black text-slate-800 dark:text-slate-200">
+                      لا توجد جلسات محاكم مجدولة في هذا اليوم
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-1">
+                      يمكنك جدولة جلسة جديدة في هذا التاريخ ({dateSessionsModal.dateStr}) بالضغط على الزر أدناه.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setNewSessionDate(dateSessionsModal.dateStr);
+                      setDateSessionsModal(null);
+                      setShowAddSessionModal(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs shadow-md transition cursor-pointer"
+                  >
+                    <PlusCircle className="w-4 h-4" />
+                    <span>إضافة جلسة في هذا اليوم</span>
+                  </button>
+                </div>
+              ) : (
+                dateSessionsModal.sessions.map((sess, idx) => (
+                  <div
+                    key={sess.id || idx}
+                    className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 hover:border-amber-500/50 space-y-3 transition"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-lg bg-amber-500 text-slate-950 font-black text-xs flex items-center justify-center font-mono">
+                          {idx + 1}
+                        </span>
+                        <h4 className="font-black text-sm text-slate-900 dark:text-slate-100 font-mono">
+                          دعوى رقم {sess.caseInfo?.caseNumber || "غير محدد"} لسنة {sess.caseInfo?.caseYear || 2026}
+                        </h4>
+                      </div>
+
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
+                        sess.timeType === "morning"
+                          ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
+                          : "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300"
+                      }`}>
+                        {sess.timeType === "morning" ? "جلسة صباحية (٩:٠٠ ص)" : "جلسة مسائية (١٢:٠٠ م)"}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-slate-400 font-bold">المحكمة والدائرة: </span>
+                        <strong className="text-slate-800 dark:text-slate-200">
+                          {sess.caseInfo?.competentCourt || "المحكمة المختصة"}
+                          {sess.caseInfo?.circuit ? ` - ${sess.caseInfo.circuit}` : ""}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 font-bold">موضوع الدعوى: </span>
+                        <strong className="text-slate-800 dark:text-slate-200">
+                          {sess.caseInfo?.subject || "متابعة قضائية"}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 font-bold">الموكل: </span>
+                        <strong className="text-emerald-700 dark:text-emerald-400">
+                          {sess.caseInfo?.clientName || "غير محدد"}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 font-bold">الخصم: </span>
+                        <strong className="text-slate-700 dark:text-slate-300">
+                          {sess.caseInfo?.opponentName || "غير محدد"}
+                        </strong>
+                      </div>
+                    </div>
+
+                    {sess.requiredWork && (
+                      <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs">
+                        <span className="text-amber-800 dark:text-amber-300 font-black">المطلوب بالجلسة: </span>
+                        <span className="text-slate-700 dark:text-slate-300">{sess.requiredWork}</span>
+                      </div>
+                    )}
+
+                    {sess.decision && (
+                      <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs">
+                        <span className="text-emerald-800 dark:text-emerald-300 font-black">قرار المحكمة الصادر: </span>
+                        <span className="text-slate-700 dark:text-slate-300">{sess.decision}</span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-200 dark:border-slate-800">
+                      <button
+                        onClick={() => {
+                          setSelectedSession(sess);
+                          setDateSessionsModal(null);
+                        }}
+                        className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-black transition cursor-pointer"
+                      >
+                        تسجيل القرار / تأجيل الجلسة
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Modal Bottom Actions */}
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              {dateSessionsModal.sessions.length > 0 && (
+                <button
+                  onClick={() => {
+                    setQuickPrintDateFilter("custom");
+                    setQuickPrintCustomDate(dateSessionsModal.dateStr);
+                    setShowQuickPrintModal(true);
+                  }}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-xl text-xs font-black shadow-xs transition cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5 text-emerald-200" />
+                  <span>طباعة رول هذا اليوم</span>
+                </button>
+              )}
+
+              <button
+                onClick={() => setDateSessionsModal(null)}
+                className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition cursor-pointer mr-auto"
+              >
+                إغلاق
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Dedicated Section OCR Modal for Sessions & Roll */}
+      <SectionDedicatedOcrModal
+        isOpen={isSessionsOcrOpen}
+        onClose={() => setIsSessionsOcrOpen(false)}
+        section="sessions"
+        language={language}
+        onApplyData={(res) => {
+          if (res.caseNumber) setNewCaseNumber(res.caseNumber);
+          if (res.caseYear) setNewCaseYear(parseInt(res.caseYear) || 2026);
+          if (res.court) setNewCourt(res.court);
+          if (res.circuit) setNewCircuit(res.circuit);
+          setShowAddSessionModal(true);
+        }}
+      />
 
     </div>
   );

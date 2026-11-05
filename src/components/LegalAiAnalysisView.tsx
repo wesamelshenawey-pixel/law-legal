@@ -12,22 +12,14 @@ export default function LegalAiAnalysisView({ cases, clients, language }: LegalA
   const [activeTab, setActiveTab] = useState<"document_analyzer" | "fee_estimator" | "document_drafting" | "consultation_bot">("document_analyzer");
 
   return (
-    <div className="w-full min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 p-6 sm:p-8 font-sans">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <div className="w-full min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 p-4 sm:p-6 font-sans">
+      <div className="max-w-6xl mx-auto space-y-4">
         
-        {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <h1 className="text-base md:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-amber-500" />
-            <span>{language === "ar" ? "مركز الذكاء الاصطناعي القانوني" : "Legal AI Center"}</span>
-          </h1>
-        </div>
-
         {/* Navigation Tabs */}
         <div className="flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
           <button
             onClick={() => setActiveTab("document_analyzer")}
-            className={`px-4 py-2 text-xs font-bold rounded-t-xl transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === "document_analyzer"
                 ? "bg-amber-500 text-slate-950 shadow-sm"
                 : "bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800"
@@ -39,7 +31,7 @@ export default function LegalAiAnalysisView({ cases, clients, language }: LegalA
           
           <button
             onClick={() => setActiveTab("fee_estimator")}
-            className={`px-4 py-2 text-xs font-bold rounded-t-xl transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === "fee_estimator"
                 ? "bg-amber-500 text-slate-950 shadow-sm"
                 : "bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800"
@@ -51,7 +43,7 @@ export default function LegalAiAnalysisView({ cases, clients, language }: LegalA
           
           <button
             onClick={() => setActiveTab("document_drafting")}
-            className={`px-4 py-2 text-xs font-bold rounded-t-xl transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === "document_drafting"
                 ? "bg-amber-500 text-slate-950 shadow-sm"
                 : "bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800"
@@ -67,15 +59,6 @@ export default function LegalAiAnalysisView({ cases, clients, language }: LegalA
           
           {activeTab === "document_analyzer" && (
             <div className="space-y-6">
-              <div className="bg-blue-50 dark:bg-blue-950/30 p-4 rounded-2xl border border-blue-200 dark:border-blue-900/50 flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-blue-800 dark:text-blue-300 font-bold leading-relaxed">
-                  {language === "ar" 
-                    ? "يقوم المحلل بقراءة العقود والمذكرات القانونية، لاستخراج البنود الأساسية، وتسليط الضوء على المخاطر والثغرات المحتملة في صياغة العقد." 
-                    : "The analyzer reads contracts and legal memos to extract key clauses, highlighting potential risks and loopholes."}
-                </p>
-              </div>
-
               <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-3xl p-10 flex flex-col items-center justify-center text-center cursor-pointer hover:border-amber-500 transition-colors bg-slate-50 dark:bg-slate-950">
                 <Upload className="w-10 h-10 text-slate-400 mb-3" />
                 <h3 className="text-sm font-black text-slate-700 dark:text-slate-200">

@@ -1,5 +1,7 @@
 export enum UserRole {
   ADMIN = "admin",             // الأستاذ الكبير وسام الشناوي (مدير النظام والمكتب)
+  LAWYER = "lawyer",           // محامي بالديوان ومستشار قانوني
+  CLERK = "clerk",             // معاون قضائي وإداري وشؤون السكرتارية
   SENIOR_LAWYER = "senior_lawyer", // محامي أول / شريك
   ASSOCIATE_LAWYER = "associate_lawyer", // محامي جدول عام / ابتدائي / استئناف
   SECRETARY = "secretary",     // السكرتارية والشؤون الإدارية
@@ -224,6 +226,7 @@ export interface ClientProfile {
   useSamePhoneForWhatsapp?: boolean;
   address?: string;      // عنوان الموكل
   password?: string;     // الباصورد المخصص للموكل للدخول على حسابه
+  phoneVerified?: boolean; // حالة تأكيد رقم الهاتف
   email?: string;
   facebook?: string;
   linkedin?: string;
@@ -263,7 +266,7 @@ export interface LeadProfile {
 
 export interface CaseMilestone {
   id: string;
-  type: "registered" | "first_session" | "judgment" | "appeal" | "custom";
+  type: "registered" | "first_session" | "judgment" | "appeal" | "custom" | "session" | "alert" | "message";
   title: string;
   titleEn?: string;
   date: string;
@@ -272,6 +275,12 @@ export interface CaseMilestone {
   circuitOrCourt?: string;
   appealNumber?: string;
   completedAt?: string;
+  timeTracker?: {
+    startTime?: string;
+    endTime?: string;
+    durationMs?: number;
+    isRunning?: boolean;
+  };
 }
 
 export interface CaseRecord {
@@ -301,6 +310,9 @@ export interface CaseRecord {
   timeline?: CaseMilestone[]; // محطات ومراحل التقاضي التفاعلية
   stage?: "registered" | "first_session" | "judgment" | "appeal" | "closed";
   status?: "active" | "archived";
+  isArchived?: boolean;
+  archivedAt?: string;
+  archiveReason?: string;
   createdAt: string;
 }
 
@@ -512,4 +524,60 @@ export interface ClientNote {
     notes?: string;
   }[];
 }
+
+export interface HandwritingSample {
+  id: string;
+  title: string;
+  category: "pleadings" | "minutes" | "receipts" | "numbers_dates" | "judge_notes" | "signatures";
+  sampleImageBase64?: string;
+  groundTruthText: string;
+  writerName: string;
+  penType?: "fountain" | "ballpoint" | "gel" | "pencil";
+  accuracyScore?: number;
+  createdAt: string;
+  notes?: string;
+}
+
+export interface HandwritingProfile {
+  id: string;
+  name: string;
+  description: string;
+  writerName: string;
+  defaultSubtype: "general" | "court_minutes" | "promissory_receipt" | "judge_endorsement" | "police_report" | "defense_draft";
+  samples: HandwritingSample[];
+  calibrationStatus: "ready" | "calibrated" | "in_training";
+  systemCalibrationGuide?: string;
+  accuracyScore?: number;
+  detectedStyle?: string;
+  lastCalibratedAt?: string;
+  isDefault?: boolean;
+}
+
+export type InterfaceDisplayType = "جدول بيانات" | "بطاقات تفاعلية" | "لوحة تحليلية" | "أجندة زمنية" | "نموذج إدخال";
+
+export interface SystemSubInterface {
+  id: string;
+  code: string;
+  title: string;
+  fieldsCount: number;
+  displayType: InterfaceDisplayType;
+  status: "نشط" | "معطل";
+  isAiGenerated: boolean;
+  sectionId: string;
+  description?: string;
+  fields?: Array<{ id: string; name: string; label: string; type: "text" | "number" | "date" | "select" | "status" | "badge"; placeholder?: string }>;
+  sampleData?: Array<Record<string, any>>;
+}
+
+export interface SystemStructureSection {
+  id: string;
+  code: string;
+  title: string;
+  description: string;
+  badge: string;
+  statusBadge: string;
+  iconName: "scale" | "users" | "dollar" | "user-check" | "archive" | "bot" | "shield" | "briefcase" | "building" | "compass" | string;
+  subInterfaces: SystemSubInterface[];
+}
+
 

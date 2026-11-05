@@ -84,135 +84,93 @@ export default function Sidebar({
   // Clean hierarchy with rich emojis instead of icons
   const categories = [
     {
-      id: "main_cases_legal",
-      titleArabic: "ديوان القضايا والخدمات القانونية",
-      titleEnglish: "Chambers & Court Registry",
+      id: "main_ten_essential_sections",
+      titleArabic: "الأقسام العشرة الأساسية للبرنامج",
+      titleEnglish: "10 Core Legal Sections",
       emoji: "🏛️",
-      roles: [UserRole.ADMIN, UserRole.STAFF, UserRole.CLIENT],
+      roles: [UserRole.ADMIN, UserRole.LAWYER, UserRole.CLERK, UserRole.SENIOR_LAWYER, UserRole.ASSOCIATE_LAWYER, UserRole.STAFF, UserRole.CLIENT],
       subsections: [
         {
-          id: "sub_cases_clients",
-          titleArabic: "إدارة الأوراق والموكلين",
-          titleEnglish: "Files & Clients",
-          emoji: "📁",
-          roles: [UserRole.ADMIN, UserRole.STAFF, UserRole.CLIENT],
+          id: "sub_core_legal_sections",
+          titleArabic: "أقسام ديوان المحاماة الرئيسية",
+          titleEnglish: "Primary Chambers Sections",
+          emoji: "⚖️",
+          roles: [UserRole.ADMIN, UserRole.LAWYER, UserRole.CLERK, UserRole.SENIOR_LAWYER, UserRole.ASSOCIATE_LAWYER, UserRole.STAFF, UserRole.CLIENT],
           items: [
-            { id: "office_services", label: language === "ar" ? "قائمة الخدمات الشاملة" : "Comprehensive Services", emoji: "⚖️", roles: [UserRole.ADMIN, UserRole.STAFF, UserRole.CLIENT, UserRole.SEEKER, UserRole.OPPONENT] },
-            { id: "urgent_followup", label: language === "ar" ? "متابعة الموكلين (الحالات العاجلة)" : "Urgent Cases Hub", emoji: "🔥", roles: [UserRole.ADMIN, UserRole.STAFF] },
-            { id: "cases", label: t("cases"), emoji: "💼", roles: [UserRole.ADMIN, UserRole.STAFF, UserRole.CLIENT] },
-            { id: "clients", label: t("clients"), emoji: "👥", roles: [UserRole.ADMIN, UserRole.STAFF] },
-            { id: "attachments", label: language === "ar" ? "مركز المرفقات والمستندات" : "Attachments & Files", emoji: "📎", roles: [UserRole.ADMIN, UserRole.STAFF, UserRole.CLIENT] },
-            { id: "import_files", label: language === "ar" ? "استيراد وإدارة الملفات" : "Import Files", emoji: "📥", roles: [UserRole.ADMIN, UserRole.STAFF] },
-            { id: "companies", label: t("companies"), emoji: "🏢", roles: [UserRole.ADMIN, UserRole.STAFF] },
-          ]
-        },
-        {
-          id: "sub_agenda_admin",
-          titleArabic: "الرصد وأجندة الجلسات اليومية",
-          titleEnglish: "Court Schedule & Agenda",
-          emoji: "📆",
-          roles: [UserRole.ADMIN, UserRole.STAFF, UserRole.CLIENT],
-          items: [
-            { id: "sessions", label: t("sessions"), emoji: "📅", roles: [UserRole.ADMIN, UserRole.STAFF, UserRole.CLIENT] },
-            { id: "adminwork", label: t("adminwork"), emoji: "📝", roles: [UserRole.ADMIN, UserRole.STAFF] },
-            { id: "smart_notifications", label: language === "ar" ? "مركز التنبيهات والتقويم الذكي" : "Smart Notifications & Calendar", emoji: "🔔", roles: [UserRole.ADMIN, UserRole.STAFF] },
+            { id: "cases", label: "١. القضايا", emoji: "💼", roles: [UserRole.ADMIN, UserRole.LAWYER, UserRole.CLERK, UserRole.SENIOR_LAWYER, UserRole.ASSOCIATE_LAWYER, UserRole.STAFF, UserRole.CLIENT] },
+            { id: "clients", label: "٢. الموكلين", emoji: "👥", roles: [UserRole.ADMIN, UserRole.LAWYER, UserRole.CLERK, UserRole.SENIOR_LAWYER, UserRole.ASSOCIATE_LAWYER, UserRole.STAFF] },
+            { id: "sessions", label: "٣. الجلسات (والتقويم)", emoji: "📅", roles: [UserRole.ADMIN, UserRole.LAWYER, UserRole.CLERK, UserRole.SENIOR_LAWYER, UserRole.ASSOCIATE_LAWYER, UserRole.STAFF, UserRole.CLIENT] },
+            { id: "adminwork", label: "٤. الاعمال الادارية", emoji: "📝", roles: [UserRole.ADMIN, UserRole.LAWYER, UserRole.CLERK, UserRole.SENIOR_LAWYER, UserRole.ASSOCIATE_LAWYER, UserRole.STAFF] },
+            { id: "attachments", label: "٥. الارشيف", emoji: "🗄️", roles: [UserRole.ADMIN, UserRole.LAWYER, UserRole.CLERK, UserRole.SENIOR_LAWYER, UserRole.ASSOCIATE_LAWYER, UserRole.STAFF, UserRole.CLIENT] },
+            { id: "lawcodes", label: "٦. المكتبة القانونيه", emoji: "📚", roles: [UserRole.ADMIN, UserRole.LAWYER, UserRole.CLERK, UserRole.SENIOR_LAWYER, UserRole.ASSOCIATE_LAWYER, UserRole.STAFF, UserRole.CLIENT] },
+            { id: "contacts", label: "٧. جهات الاتصال (دليل الهواتف)", emoji: "📞", roles: [UserRole.ADMIN, UserRole.LAWYER, UserRole.CLERK, UserRole.SENIOR_LAWYER, UserRole.ASSOCIATE_LAWYER, UserRole.STAFF] },
+            { id: "legal_templates", label: "٨. قوالب العقود والدعاوي", emoji: "📜", roles: [UserRole.ADMIN, UserRole.LAWYER, UserRole.CLERK, UserRole.SENIOR_LAWYER, UserRole.ASSOCIATE_LAWYER, UserRole.STAFF] },
+            { id: "doc_editor", label: "٩. محرر النصوص", emoji: "✍️", roles: [UserRole.ADMIN, UserRole.LAWYER, UserRole.CLERK, UserRole.SENIOR_LAWYER, UserRole.ASSOCIATE_LAWYER, UserRole.STAFF] },
+            { id: "smart_ocr", label: "١٠. الطباعة والسكانر", emoji: "🖨️", roles: [UserRole.ADMIN, UserRole.LAWYER, UserRole.CLERK, UserRole.SENIOR_LAWYER, UserRole.ASSOCIATE_LAWYER, UserRole.STAFF, UserRole.CLIENT] },
           ]
         }
       ]
     },
     {
       id: "main_finance_reg",
-      titleArabic: "شؤون الخزينة والتوثيقات والمعرفة",
-      titleEnglish: "Treasury & Document Registry",
-      emoji: "⚖️",
-      roles: [UserRole.ADMIN, UserRole.STAFF, UserRole.CLIENT],
+      titleArabic: "شؤون الخزينة والأتعاب والتوثيق",
+      titleEnglish: "Treasury & Registry",
+      emoji: "💰",
+      roles: [UserRole.ADMIN, UserRole.LAWYER, UserRole.SENIOR_LAWYER, UserRole.STAFF, UserRole.CLIENT],
       subsections: [
         {
           id: "sub_treasury",
-          titleArabic: "الرعايات المالية والمتحصلات",
-          titleEnglish: "Financial & Bills",
-          emoji: "💰",
-          roles: [UserRole.ADMIN, UserRole.STAFF, UserRole.CLIENT],
+          titleArabic: "الأتعاب والمستندات",
+          titleEnglish: "Finance & Docs",
+          emoji: "💵",
+          roles: [UserRole.ADMIN, UserRole.LAWYER, UserRole.SENIOR_LAWYER, UserRole.STAFF, UserRole.CLIENT],
           items: [
-            { id: "fees", label: t("fees"), emoji: "💵", roles: [UserRole.ADMIN, UserRole.STAFF, UserRole.CLIENT] },
-            { id: "documentation", label: t("documentation"), emoji: "📑", roles: [UserRole.ADMIN, UserRole.STAFF] },
-          ]
-        },
-        {
-          id: "sub_codes_lib",
-          titleArabic: "المكتبة والأكواد القضائية",
-          titleEnglish: "Legal Library & Codes",
-          emoji: "📚",
-          roles: [UserRole.ADMIN, UserRole.STAFF, UserRole.CLIENT],
-          items: [
-            { id: "legal_templates", label: language === "ar" ? "مكتبة القوالب القانونية والعقود" : "Legal Templates & Contracts", emoji: "📜", roles: [UserRole.ADMIN, UserRole.STAFF] },
-            { id: "lawcodes", label: t("lawcodes"), emoji: "📖", roles: [UserRole.ADMIN, UserRole.STAFF, UserRole.CLIENT] },
+            { id: "fees", label: t("fees"), emoji: "💵", roles: [UserRole.ADMIN, UserRole.LAWYER, UserRole.SENIOR_LAWYER, UserRole.STAFF, UserRole.CLIENT] },
+            { id: "documentation", label: t("documentation"), emoji: "📑", roles: [UserRole.ADMIN, UserRole.LAWYER, UserRole.STAFF] },
           ]
         }
       ]
     },
     {
       id: "main_social_ai",
-      titleArabic: "الاستشارات والإعلانات والتواصل",
-      titleEnglish: "AI, Announcements & Social",
-      emoji: "📢",
-      roles: [UserRole.ADMIN, UserRole.STAFF, UserRole.CLIENT, UserRole.SEEKER, UserRole.OPPONENT],
+      titleArabic: "الذكاء الاصطناعي والاستشارات والتواصل",
+      titleEnglish: "AI & Communications",
+      emoji: "🤖",
+      roles: [UserRole.ADMIN, UserRole.LAWYER, UserRole.CLERK, UserRole.SENIOR_LAWYER, UserRole.STAFF, UserRole.CLIENT, UserRole.SEEKER],
       subsections: [
         {
           id: "sub_interactivity",
-          titleArabic: "قاعات الحوار والإفتاء القانوني",
-          titleEnglish: "Interactives Hub",
+          titleArabic: "الروبوتات والاستشارات",
+          titleEnglish: "Robots & Consultation",
           emoji: "🌐",
-          roles: [UserRole.ADMIN, UserRole.STAFF, UserRole.CLIENT, UserRole.SEEKER, UserRole.OPPONENT],
+          roles: [UserRole.ADMIN, UserRole.LAWYER, UserRole.CLERK, UserRole.SENIOR_LAWYER, UserRole.STAFF, UserRole.CLIENT, UserRole.SEEKER],
           items: [
-            { id: "egyptian_lawyer_ai", label: language === "ar" ? "المحامي المصري الذكي (Egyptian Lawyer AI)" : "Egyptian Lawyer AI", emoji: "⚖️", roles: [UserRole.ADMIN, UserRole.STAFF, UserRole.CLIENT, UserRole.SEEKER, UserRole.OPPONENT] },
-            { id: "announcements", label: "شريط الإعلانات والتعميمات", emoji: "📢", roles: [UserRole.ADMIN, UserRole.STAFF, UserRole.CLIENT, UserRole.SEEKER, UserRole.OPPONENT] },
-            { id: "social", label: t("social"), emoji: "🗨️", roles: [UserRole.ADMIN, UserRole.STAFF, UserRole.CLIENT, UserRole.SEEKER, UserRole.OPPONENT] },
-            { id: "ai", label: t("ai"), emoji: "🤖", roles: [UserRole.ADMIN, UserRole.STAFF, UserRole.CLIENT, UserRole.SEEKER] },
-          ]
-        }
-      ]
-    },
-    {
-      id: "main_advanced_tools",
-      titleArabic: "المحرر الذكي والماسح الضوئي",
-      titleEnglish: "Editor & Smart OCR",
-      emoji: "✨",
-      roles: [UserRole.ADMIN, UserRole.STAFF],
-      subsections: [
-        {
-          id: "sub_advanced_studios",
-          titleArabic: "استوديوهات الصياغة والمسح",
-          titleEnglish: "Drafting & OCR Studios",
-          emoji: "⚡",
-          roles: [UserRole.ADMIN, UserRole.STAFF],
-          items: [
-            { id: "legal_ai_analysis", label: language === "ar" ? "مركز الذكاء الاصطناعي القانوني" : "Legal AI Center", emoji: "🧠", roles: [UserRole.ADMIN, UserRole.STAFF] },
-            { id: "doc_editor", label: "محرر المستندات المتطور", emoji: "✍️", roles: [UserRole.ADMIN, UserRole.STAFF] },
-            { id: "smart_ocr", label: "الفحص واستخراج النصوص (OCR)", emoji: "🔍", roles: [UserRole.ADMIN, UserRole.STAFF] },
-            { id: "keep", label: language === "ar" ? "ملاحظات ومذكرات Google Keep" : "Google Keep Legal Notes", emoji: "📌", roles: [UserRole.ADMIN, UserRole.STAFF, UserRole.CLIENT] },
-            { id: "workspace", label: language === "ar" ? "منظومة Google Workspace السحابية" : "Google Workspace Cloud", emoji: "🌐", roles: [UserRole.ADMIN, UserRole.STAFF] },
+            { id: "ai_agents_hub", label: "ديوان وكلاء الذكاء الاصطناعي (24/7)", emoji: "🤖", roles: [UserRole.ADMIN, UserRole.LAWYER, UserRole.SENIOR_LAWYER, UserRole.STAFF, UserRole.CLIENT] },
+            { id: "egyptian_lawyer_ai", label: "المحامي المصري الذكي", emoji: "⚖️", roles: [UserRole.ADMIN, UserRole.LAWYER, UserRole.SENIOR_LAWYER, UserRole.STAFF, UserRole.CLIENT] },
+            { id: "communications", label: "مركز المراسلات الموحد", emoji: "📱", roles: [UserRole.ADMIN, UserRole.LAWYER, UserRole.STAFF] },
+            { id: "social", label: t("social"), emoji: "🗨️", roles: [UserRole.ADMIN, UserRole.LAWYER, UserRole.STAFF, UserRole.CLIENT] },
+            { id: "office_services", label: "خدمات المكتب", emoji: "🏛️", roles: [UserRole.ADMIN, UserRole.LAWYER, UserRole.STAFF, UserRole.CLIENT] },
           ]
         }
       ]
     },
     {
       id: "main_system_admin",
-      titleArabic: "إدارة التطبيق والمظهر",
-      titleEnglish: "App & Theme Settings",
+      titleArabic: "الإعدادات وضبط البرنامج",
+      titleEnglish: "Settings & Setup",
       emoji: "⚙️",
-      roles: [UserRole.ADMIN, UserRole.STAFF, UserRole.CLIENT, UserRole.SEEKER, UserRole.OPPONENT],
+      roles: [UserRole.ADMIN, UserRole.LAWYER, UserRole.STAFF],
       subsections: [
         {
           id: "sub_system_settings",
-          titleArabic: "التصميمات والإعدادات العامة",
-          titleEnglish: "Designs & App Settings",
+          titleArabic: "التخصيص والإدارة",
+          titleEnglish: "Customization",
           emoji: "🎨",
-          roles: [UserRole.ADMIN, UserRole.STAFF, UserRole.CLIENT, UserRole.SEEKER, UserRole.OPPONENT],
+          roles: [UserRole.ADMIN, UserRole.LAWYER, UserRole.STAFF],
           items: [
-            { id: "designs", label: language === "ar" ? "قسم التصميمات والمظاهر" : "Themes & Designs", emoji: "🎨", roles: [UserRole.ADMIN, UserRole.STAFF, UserRole.CLIENT, UserRole.SEEKER, UserRole.OPPONENT] },
+            { id: "designs", label: "المظهر والتصميمات", emoji: "🎨", roles: [UserRole.ADMIN, UserRole.LAWYER, UserRole.STAFF] },
             { id: "settings", label: t("settings"), emoji: "⚙️", roles: [UserRole.ADMIN] },
-            { id: "tenants_admin", _isMasterOnly: true, label: language === "ar" ? "إدارة المكاتب والمشتركين" : "Tenants Admin", emoji: "🏢", roles: [UserRole.ADMIN] },
+            { id: "tenants_admin", _isMasterOnly: true, label: "إدارة المشتركين", emoji: "🏢", roles: [UserRole.ADMIN] },
           ]
         }
       ]
@@ -263,7 +221,7 @@ export default function Sidebar({
               x: isRtl ? 50 : -50 
             }}
             animate={{ 
-              width: sidebarMode === "full" ? 320 : 80, 
+              width: sidebarMode === "full" ? 275 : 70, 
               opacity: 1,
               x: 0 
             }}
@@ -278,13 +236,13 @@ export default function Sidebar({
               damping: 30,
               mass: 0.8
             }}
-            className={`fixed top-20 bottom-4 z-40 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl rounded-3xl flex flex-col overflow-hidden ${
-              isRtl ? "right-4" : "left-4"
+            className={`fixed top-16 bottom-3 z-40 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl rounded-3xl flex flex-col overflow-hidden ${
+              isRtl ? "right-2" : "left-2"
             }`}
             dir={isRtl ? "rtl" : "ltr"}
           >
             {/* Top spacer for padding */}
-            <div className="h-4 flex-shrink-0" />
+            <div className="h-3 flex-shrink-0" />
             
             <div className="flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pb-20">
               {/* Nav Items Section */}

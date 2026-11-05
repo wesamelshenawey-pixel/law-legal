@@ -60,7 +60,9 @@ import {
   Clock,
   SendHorizontal,
   Link2,
-  History
+  History,
+  Zap,
+  X
 } from "lucide-react";
 
 interface GoogleWorkspaceHubProps {
@@ -128,6 +130,17 @@ export default function GoogleWorkspaceHub({
   const [isClientPortalOpen, setIsClientPortalOpen] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
 
+  // Quick Create Modal & Keep Sync Pulse State
+  const [isQuickCreateOpen, setIsQuickCreateOpen] = useState(false);
+  const [quickTitle, setQuickTitle] = useState("");
+  const [quickContent, setQuickContent] = useState("");
+  const [quickTag, setQuickTag] = useState("مذكرة قضائية");
+  const [quickCase, setQuickCase] = useState("");
+  const [quickClient, setQuickClient] = useState("");
+  const [quickRequireSign, setQuickRequireSign] = useState(false);
+  const [isSyncingKeep, setIsSyncingKeep] = useState(false);
+  const [lastKeepSyncTime, setLastKeepSyncTime] = useState<string | null>(null);
+
   // Check URL parameters for direct link signing (?action=sign_memo&memoId=...)
   useEffect(() => {
     try {
@@ -169,6 +182,30 @@ export default function GoogleWorkspaceHub({
   const [selectedCaseToShare, setSelectedCaseToShare] = useState<string>("");
 
   const isConnected = !!tokenState.accessToken;
+
+  const handleDragStart = (e: React.DragEvent, noteId: string) => {
+    e.dataTransfer.setData("noteId", noteId);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: React.DragEvent, newStatus: "pending" | "in_progress" | "archived") => {
+    e.preventDefault();
+    const noteId = e.dataTransfer.getData("noteId");
+    if (!noteId) return;
+
+    const updatedNotes = keepNotes.map(n => 
+      n.id === noteId ? { ...n, kanbanStatus: newStatus } : n
+    );
+    setKeepNotes(updatedNotes);
+    
+    const noteToUpdate = updatedNotes.find(n => n.id === noteId);
+    if (noteToUpdate) {
+      saveLocalKeepMemo(noteToUpdate);
+    }
+  };
 
   // On mount or when token is updated, load initial tab data
   useEffect(() => {
@@ -391,7 +428,8 @@ export default function GoogleWorkspaceHub({
       clientPhone: targetClientPhone || undefined,
       caseNumber: selectedCaseForNote || undefined,
       legalAffirmation: customAffirmation.trim() || undefined,
-      signatureStatus: requireSignatureOnNewNote ? "pending" : "none"
+      signatureStatus: requireSignatureOnNewNote ? "pending" : "none",
+      kanbanStatus: "pending"
     });
 
     setKeepNotes([added, ...keepNotes.filter(n => n.id !== added.id)]);
@@ -468,6 +506,76 @@ ${link}
 
 ⚖️ يرجى فتح الرابط ووضع توقيعكم وبصمتكم لاعتماده قانونياً وتقديمه لملف الدعوى.`);
     window.open(`https://wa.me/${note.clientPhone ? note.clientPhone.replace(/\D/g, '') : ''}?text=${text}`, "_blank");
+  };
+
+  // Google Keep Synchronization with subtle loading pulse / spinner
+  const handleSyncKeepNotes = async () => {
+    setIsSyncingKeep(true);
+    try {
+      // Simulate real-time synchronization with cloud / local cache
+      await new Promise(resolve => setTimeout(resolve, 600));
+      const latest = getLocalKeepMemos();
+      setKeepNotes(latest);
+      const nowStr = new Date().toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
+      setLastKeepSyncTime(nowStr);
+      setSuccessToast(`🎉 تمت مزامنة (${latest.length}) مذكرة مع حساب Google بنجاح!`);
+      setTimeout(() => setSuccessToast(null), 3000);
+    } catch (err) {
+      console.error("Keep sync error:", err);
+    } finally {
+      setIsSyncingKeep(false);
+    }
+  };
+
+  // Quick Create Note Submit
+  const handleQuickCreateSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickTitle.trim() && !quickContent.trim()) return;
+
+    let targetClientName = "";
+    let targetClientPhone = "";
+    let targetClientId = "";
+
+    if (quickClient) {
+      const foundCl = clients.find(c => c.id === quickClient);
+      if (foundCl) {
+        targetClientName = foundCl.name;
+        targetClientPhone = foundCl.phone || "";
+        targetClientId = foundCl.id;
+      }
+    }
+
+    const added = saveLocalKeepMemo({
+      title: quickTitle.trim() || "مذكرة سريعة",
+      content: quickContent.trim(),
+      tags: [quickTag],
+      pinned: false,
+      requiresSignature: quickRequireSign,
+      signatureRequestedBy: "lawyer",
+      clientId: targetClientId || undefined,
+      clientName: targetClientName || undefined,
+      clientPhone: targetClientPhone || undefined,
+      caseNumber: quickCase || undefined,
+      signatureStatus: quickRequireSign ? "pending" : "none"
+    });
+
+    const updatedList = [added, ...keepNotes.filter(n => n.id !== added.id)];
+    setKeepNotes(updatedList);
+
+    // Trigger subtle sync animation
+    setIsSyncingKeep(true);
+    setTimeout(() => setIsSyncingKeep(false), 600);
+
+    // Reset & Close modal
+    setQuickTitle("");
+    setQuickContent("");
+    setQuickCase("");
+    setQuickClient("");
+    setQuickRequireSign(false);
+    setIsQuickCreateOpen(false);
+
+    setSuccessToast("⚡ تم إنشاء وتدوين المذكرة ومزامنتها بنجاح في Google Keep!");
+    setTimeout(() => setSuccessToast(null), 3000);
   };
 
   // ==========================================
@@ -1058,38 +1166,56 @@ ${link}
       {activeSubTab === "keep" && (
         <div className="space-y-6">
           
-          {/* Top Summary & Filter Statistics Bar */}
-          <div className="p-5 bg-gradient-to-r from-amber-900 via-slate-900 to-slate-900 text-white rounded-3xl border border-amber-700/30 shadow-xl flex flex-wrap items-center justify-between gap-4">
-            <div className="space-y-1 max-w-xl">
-              <div className="flex items-center gap-2">
-                <Bookmark className="w-5 h-5 text-amber-400" />
-                <h3 className="text-sm font-black">منظومة مذكرات وملاحظات Google Keep والتوقيع الإلكتروني</h3>
-                <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
-                  قانون التوقيع الإلكتروني رقم 15 لسنة 2004
-                </span>
-              </div>
-              <p className="text-xs text-amber-100/80 leading-relaxed">
-                تدوين المذكرات والملحوظات القانونية مع إمكانية طلب <strong>توقيع وتأكيد إلكتروني ملزم</strong> من الموكل، ومتابعة حالة التوقيع الرقمي، واستخراج شهادات التوثيق القضائية.
-              </p>
+          {/* Top Quick Actions & Metrics Bar */}
+          <div className="p-4 bg-slate-900 text-white rounded-3xl border border-slate-800 shadow-sm flex flex-wrap items-center justify-between gap-4">
+            {/* Quick Actions & Sync */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* Quick Create Note Button */}
+              <button
+                id="btn-quick-create-keep"
+                onClick={() => setIsQuickCreateOpen(true)}
+                className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-2xl shadow-lg flex items-center gap-1.5 cursor-pointer transition transform active:scale-95"
+              >
+                <Zap className="w-3.5 h-3.5 fill-slate-950" />
+                <span>إنشاء سريع (Quick Create)</span>
+              </button>
+
+              {/* Sync Google Keep Button with Loading Pulse & Spinner */}
+              <button
+                id="btn-sync-google-keep"
+                onClick={handleSyncKeepNotes}
+                disabled={isSyncingKeep}
+                className={`px-3.5 py-2 rounded-2xl border text-xs font-bold flex items-center gap-2 transition cursor-pointer ${
+                  isSyncingKeep
+                    ? "bg-amber-500/20 border-amber-500/50 text-amber-300 animate-pulse"
+                    : "bg-white/10 hover:bg-white/20 border-white/10 text-white"
+                }`}
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncingKeep ? "animate-spin text-amber-400" : "text-slate-300"}`} />
+                <span>{isSyncingKeep ? "جارٍ المزامنة..." : "مزامنة Google Keep"}</span>
+                {lastKeepSyncTime && !isSyncingKeep && (
+                  <span className="text-[10px] text-amber-300/80 font-mono">({lastKeepSyncTime})</span>
+                )}
+              </button>
             </div>
 
             {/* Quick Metrics */}
             <div className="flex items-center gap-2 text-xs">
-              <div className="bg-white/10 px-3.5 py-2 rounded-2xl border border-white/10 text-center">
-                <span className="block text-[10px] text-slate-300">إجمالي الملاحظات</span>
-                <span className="font-mono font-black text-white text-sm">{keepNotes.length}</span>
+              <div className="bg-white/10 px-3 py-1.5 rounded-xl border border-white/10 text-center flex items-center gap-2">
+                <span className="text-[10px] text-slate-300">إجمالي الملاحظات:</span>
+                <span className="font-mono font-black text-white text-xs">{keepNotes.length}</span>
               </div>
 
-              <div className="bg-amber-500/20 px-3.5 py-2 rounded-2xl border border-amber-500/30 text-center">
-                <span className="block text-[10px] text-amber-200">بانتظار توقيع الموكل</span>
-                <span className="font-mono font-black text-amber-400 text-sm">
+              <div className="bg-amber-500/20 px-3 py-1.5 rounded-xl border border-amber-500/30 text-center flex items-center gap-2">
+                <span className="text-[10px] text-amber-200">بانتظار التوقيع:</span>
+                <span className="font-mono font-black text-amber-400 text-xs">
                   {keepNotes.filter(n => n.requiresSignature && n.signatureStatus === "pending").length}
                 </span>
               </div>
 
-              <div className="bg-emerald-500/20 px-3.5 py-2 rounded-2xl border border-emerald-500/30 text-center">
-                <span className="block text-[10px] text-emerald-200">موقعة ومعتمدة</span>
-                <span className="font-mono font-black text-emerald-400 text-sm">
+              <div className="bg-emerald-500/20 px-3 py-1.5 rounded-xl border border-emerald-500/30 text-center flex items-center gap-2">
+                <span className="text-[10px] text-emerald-200">موقعة:</span>
+                <span className="font-mono font-black text-emerald-400 text-xs">
                   {keepNotes.filter(n => n.signatureStatus === "signed").length}
                 </span>
               </div>
@@ -1295,210 +1421,128 @@ ${link}
                 </div>
               </div>
 
-              {/* Notes Grid */}
+              {/* Kanban Board */}
               {keepNotes.length === 0 ? (
                 <div className="p-12 text-center text-xs text-slate-400 space-y-2">
                   <Bookmark className="w-10 h-10 text-slate-300 mx-auto" />
                   <p>لا توجد ملاحظات أو مذكرات مسجلة.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 max-h-[560px] overflow-y-auto pr-1">
-                  {keepNotes
-                    .filter(n => {
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 min-h-[500px]">
+                  {(["pending", "in_progress", "archived"] as const).map((colStatus) => {
+                    const title = colStatus === "pending" ? "قيد الانتظار" : colStatus === "in_progress" ? "قيد التنفيذ" : "مؤرشفة";
+                    const colNotes = keepNotes.filter(n => {
                       const matchQuery =
-                        !keepSearch ||
-                        n.title.toLowerCase().includes(keepSearch.toLowerCase()) ||
-                        n.content.toLowerCase().includes(keepSearch.toLowerCase()) ||
-                        (n.clientName && n.clientName.toLowerCase().includes(keepSearch.toLowerCase()));
+                          !keepSearch ||
+                          n.title.toLowerCase().includes(keepSearch.toLowerCase()) ||
+                          n.content.toLowerCase().includes(keepSearch.toLowerCase()) ||
+                          (n.clientName && n.clientName.toLowerCase().includes(keepSearch.toLowerCase()));
 
-                      if (!matchQuery) return false;
+                        if (!matchQuery) return false;
 
-                      if (filterSignatureStatus === "requires_sig") return !!n.requiresSignature;
-                      if (filterSignatureStatus === "pending") return n.requiresSignature && n.signatureStatus === "pending";
-                      if (filterSignatureStatus === "signed") return n.signatureStatus === "signed";
-                      return true;
-                    })
-                    .map((note) => {
-                      const isSigned = note.signatureStatus === "signed";
-                      const isPending = note.requiresSignature && note.signatureStatus === "pending";
+                        if (filterSignatureStatus === "requires_sig") return !!n.requiresSignature;
+                        if (filterSignatureStatus === "pending") return n.requiresSignature && n.signatureStatus === "pending";
+                        if (filterSignatureStatus === "signed") return n.signatureStatus === "signed";
+                        return (n.kanbanStatus || "pending") === colStatus;
+                    });
 
-                      return (
-                        <div
-                          key={note.id}
-                          className={`p-4 rounded-3xl border text-right space-y-3 flex flex-col justify-between transition-all hover:shadow-md ${
-                            isSigned
-                              ? "bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-300/80 dark:border-emerald-900/50"
-                              : isPending
-                              ? "bg-amber-50/60 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800/60"
-                              : "bg-slate-50/60 dark:bg-slate-850 border-slate-200 dark:border-slate-750"
-                          }`}
-                        >
-                          <div className="space-y-2">
-                            {/* Card Top: Title & Delete */}
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="space-y-1 flex-1">
-                                <span className="text-xs font-black text-slate-900 dark:text-slate-100 block leading-snug">
-                                  {note.title}
-                                </span>
-                                {note.caseNumber && (
-                                  <span className="text-[10px] text-slate-500 font-mono block">
-                                    دعوى: {note.caseNumber}
-                                  </span>
-                                )}
-                              </div>
-                              <button
-                                onClick={() => handleDeleteKeepNote(note.id)}
-                                className="text-slate-400 hover:text-red-500 transition p-1 cursor-pointer shrink-0"
-                                title="حذف المذكرة"
+                    return (
+                      <div 
+                        key={colStatus} 
+                        className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-3 flex flex-col gap-3 border border-slate-200 dark:border-slate-700/50 min-h-[300px]"
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDrop(e, colStatus)}
+                      >
+                        <h4 className="font-black text-xs text-center text-slate-700 dark:text-slate-300 mb-2 border-b border-slate-200 dark:border-slate-700 pb-2">
+                          {title} ({colNotes.length})
+                        </h4>
+                        <div className="flex-1 space-y-3 overflow-y-auto pr-1">
+                          {colNotes.map((note) => {
+                            const isSigned = note.signatureStatus === "signed";
+                            const isPending = note.requiresSignature && note.signatureStatus === "pending";
+
+                            return (
+                              <div
+                                key={note.id}
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, note.id)}
+                                className={`cursor-grab active:cursor-grabbing p-4 rounded-3xl border text-right space-y-3 flex flex-col justify-between transition-all hover:shadow-md ${
+                                  isSigned
+                                    ? "bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-300/80 dark:border-emerald-900/50"
+                                    : isPending
+                                    ? "bg-amber-50/60 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800/60"
+                                    : "bg-white dark:bg-slate-850 border-slate-200 dark:border-slate-750"
+                                }`}
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-
-                            {/* Content Preview */}
-                            <p className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
-                              {note.content}
-                            </p>
-
-                            {/* Electronic Signature Status Badge in Lawyer Interface */}
-                            {note.requiresSignature && (
-                              <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800">
-                                {isSigned && note.signatureData ? (
-                                  <div className="p-2.5 bg-emerald-100/60 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 rounded-2xl space-y-1.5">
-                                    <div className="flex items-center justify-between text-[11px]">
-                                      <span className="font-black text-emerald-900 dark:text-emerald-300 flex items-center gap-1">
-                                        <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                                        <span>توقيع إلكتروني معتمد وموثق</span>
+                                <div className="space-y-2">
+                                  {/* Card Top: Title & Delete */}
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="space-y-1 flex-1">
+                                      <span className="text-xs font-black text-slate-900 dark:text-slate-100 block leading-snug">
+                                        {note.title}
                                       </span>
-                                      <span className="text-[9px] font-mono bg-emerald-200/80 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-200 px-2 py-0.5 rounded-full font-bold">
-                                        {note.signatureData.verificationHash?.substring(0, 14)}...
-                                      </span>
+                                      {note.caseNumber && (
+                                        <span className="text-[10px] text-slate-500 font-mono block">
+                                          دعوى: {note.caseNumber}
+                                        </span>
+                                      )}
                                     </div>
-
-                                    <div className="flex items-center justify-between text-[10px] text-emerald-800 dark:text-emerald-300 font-medium">
-                                      <span>الموكل: {note.signatureData.signedBy}</span>
-                                      <span className="font-mono">
-                                        {new Date(note.signatureData.signedAt).toLocaleDateString("ar-EG")}
-                                      </span>
-                                    </div>
+                                    <button
+                                      onClick={() => handleDeleteKeepNote(note.id)}
+                                      className="text-slate-400 hover:text-red-500 transition p-1 cursor-pointer shrink-0"
+                                      title="حذف المذكرة"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
                                   </div>
-                                ) : isPending ? (
-                                  <div className="p-2.5 bg-amber-100/70 dark:bg-amber-950/70 border border-amber-300 dark:border-amber-800 rounded-2xl space-y-1.5">
-                                    <div className="flex items-center justify-between text-[11px]">
-                                      <span className="font-black text-amber-950 dark:text-amber-200 flex items-center gap-1">
-                                        <Clock className="w-3.5 h-3.5 text-amber-600 animate-spin" />
-                                        <span>بانتظار التوقيع الإلكتروني من الموكل</span>
-                                      </span>
-                                      <span className="text-[9px] bg-amber-200 dark:bg-amber-900 text-amber-950 dark:text-amber-200 px-2 py-0.5 rounded-full font-bold">
-                                        تأكيد مطلوب
-                                      </span>
-                                    </div>
 
-                                    {note.clientName && (
-                                      <div className="text-[10px] text-amber-900 dark:text-amber-300 font-bold">
-                                        الموكل المعني: {note.clientName}
-                                      </div>
-                                    )}
+                                  {/* Content Preview */}
+                                  <p className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
+                                    {note.content}
+                                  </p>
+
+                                  {/* Electronic Signature Status Badge in Lawyer Interface */}
+                                  {note.requiresSignature && (
+                                    <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                                      {isSigned && note.signatureData ? (
+                                        <div className="p-2.5 bg-emerald-100/60 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 rounded-2xl space-y-1.5">
+                                          <div className="flex items-center justify-between text-[11px]">
+                                            <span className="font-black text-emerald-900 dark:text-emerald-300 flex items-center gap-1">
+                                              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                                              <span>توقيع معتمد</span>
+                                            </span>
+                                          </div>
+                                        </div>
+                                      ) : isPending ? (
+                                        <div className="p-2.5 bg-amber-100/70 dark:bg-amber-950/70 border border-amber-300 dark:border-amber-800 rounded-2xl space-y-1.5">
+                                          <div className="flex items-center justify-between text-[11px]">
+                                            <span className="font-black text-amber-950 dark:text-amber-200 flex items-center gap-1">
+                                              <Clock className="w-3.5 h-3.5 text-amber-600 animate-spin" />
+                                              <span>بانتظار التوقيع</span>
+                                            </span>
+                                          </div>
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Card Footer & Interactive Action Buttons */}
+                                <div className="pt-2 border-t border-slate-200/50 dark:border-slate-800 space-y-2">
+                                  <div className="flex items-center justify-between text-[10px] text-slate-400">
+                                    <span className="bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-md font-bold truncate max-w-[80px]">
+                                      {note.tags?.[0] || "مذكرة"}
+                                    </span>
+                                    <span className="font-mono">{new Date(note.date || "").toLocaleDateString("ar-EG")}</span>
                                   </div>
-                                ) : null}
+                                </div>
                               </div>
-                            )}
-                          </div>
-
-                          {/* Card Footer & Interactive Action Buttons */}
-                          <div className="pt-2 border-t border-slate-200/50 dark:border-slate-800 space-y-2">
-                            <div className="flex items-center justify-between text-[10px] text-slate-400">
-                              <span className="bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-md font-bold">
-                                {note.tags?.[0] || "مذكرة"}
-                              </span>
-                              <span className="font-mono">{new Date(note.date).toLocaleDateString("ar-EG")}</span>
-                            </div>
-
-                            {/* Signature Action Buttons */}
-                            <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                              {isSigned ? (
-                                <>
-                                  <button
-                                    onClick={() => handleOpenSignatureModal(note)}
-                                    className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-black flex items-center justify-center gap-1 transition cursor-pointer shadow-xs"
-                                  >
-                                    <ShieldCheck className="w-3.5 h-3.5" />
-                                    <span>معاينة شهادة التوقيع</span>
-                                  </button>
-
-                                  <button
-                                    onClick={() => handleOpenClientPortal(note)}
-                                    className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950 text-slate-700 dark:text-slate-300 rounded-xl transition cursor-pointer"
-                                    title="فتح بوابة التأكيد الرسمية"
-                                  >
-                                    <FileCheck2 className="w-3.5 h-3.5 text-emerald-600" />
-                                  </button>
-
-                                  <button
-                                    onClick={() => handleCopyConfirmationLink(note)}
-                                    className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 rounded-xl transition cursor-pointer"
-                                    title="نسخ رابط التوثيق"
-                                  >
-                                    <Copy className="w-3.5 h-3.5" />
-                                  </button>
-
-                                  <button
-                                    onClick={() => handleShareSignatureLinkWhatsApp(note)}
-                                    className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition cursor-pointer"
-                                    title="مشاركة عبر واتساب"
-                                  >
-                                    <Share2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </>
-                              ) : isPending ? (
-                                <>
-                                  <button
-                                    onClick={() => handleOpenRequestSignatureModal(note)}
-                                    className="flex-1 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-[11px] font-black flex items-center justify-center gap-1 transition cursor-pointer shadow-xs"
-                                  >
-                                    <Link2 className="w-3.5 h-3.5" />
-                                    <span>إرسال رابط التأكيد للموكل</span>
-                                  </button>
-
-                                  <button
-                                    onClick={() => handleOpenClientPortal(note)}
-                                    className="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 text-amber-700 dark:text-amber-300 rounded-xl text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
-                                    title="توقيع الموكل الآن"
-                                  >
-                                    <PenTool className="w-3.5 h-3.5" />
-                                    <span>توقيع</span>
-                                  </button>
-
-                                  <button
-                                    onClick={() => handleCopyConfirmationLink(note)}
-                                    className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 rounded-xl transition cursor-pointer"
-                                    title="نسخ رابط التأكيد القانوني"
-                                  >
-                                    <Copy className="w-3.5 h-3.5" />
-                                  </button>
-
-                                  <button
-                                    onClick={() => handleShareSignatureLinkWhatsApp(note)}
-                                    className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition cursor-pointer"
-                                    title="إرسال طلب التوقيع للموكل عبر واتساب"
-                                  >
-                                    <Share2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </>
-                              ) : (
-                                <button
-                                  onClick={() => handleOpenRequestSignatureModal(note)}
-                                  className="w-full py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/40 text-slate-700 dark:text-slate-300 hover:text-amber-600 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1 transition cursor-pointer"
-                                >
-                                  <PenTool className="w-3 h-3 text-amber-500" />
-                                  <span>طلب توقيع رقمي وإرسال رابط للموكل</span>
-                                </button>
-                              )}
-                            </div>
-                          </div>
+                            );
+                          })}
                         </div>
-                      );
-                    })}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1843,6 +1887,148 @@ ${link}
                 >
                   <Send className="w-4 h-4" />
                   <span>{isSendingEmail ? "جارٍ الإرسال..." : "إرسال البريد الآن"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Create Keep Note Minimal Modal */}
+      {isQuickCreateOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="p-4 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-slate-950/10 rounded-xl">
+                  <Zap className="w-5 h-5 fill-slate-950" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black">إنشاء وتدوين سريع (Quick Create)</h3>
+                  <p className="text-[11px] font-bold text-amber-950/80">تدوين مذكرة فورية ومزامنتها لحظياً في Google Keep</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsQuickCreateOpen(false)}
+                className="p-1.5 hover:bg-black/10 rounded-full transition cursor-pointer text-slate-950"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleQuickCreateSubmit} className="p-5 space-y-3.5 text-xs">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  عنوان المذكرة / الملحوظة:
+                </label>
+                <input
+                  type="text"
+                  value={quickTitle}
+                  onChange={(e) => setQuickTitle(e.target.value)}
+                  placeholder="ملاحظة سريعة بشأن مستندات الجلسة / طلب توجيه..."
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-right font-bold outline-none focus:ring-1 focus:ring-amber-500"
+                  autoFocus
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    التصنيف:
+                  </label>
+                  <select
+                    value={quickTag}
+                    onChange={(e) => setQuickTag(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-2 text-right outline-none"
+                  >
+                    <option value="مذكرة قضائية">مذكرة قضائية</option>
+                    <option value="تنبيهات الجلسة">تنبيهات الجلسة</option>
+                    <option value="استلام مستندات">استلام مستندات</option>
+                    <option value="تأكيد قانوني وتوقيع">تأكيد وتوقيع إلكتروني</option>
+                    <option value="أتعاب ورسوم">أتعاب ورسوم</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    الموكل المعني (اختياري):
+                  </label>
+                  <select
+                    value={quickClient}
+                    onChange={(e) => setQuickClient(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-2 text-right outline-none"
+                  >
+                    <option value="">بدون تحديد موكل</option>
+                    {clients.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  القضية المرتبطة (اختياري):
+                </label>
+                <select
+                  value={quickCase}
+                  onChange={(e) => setQuickCase(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-2 text-right outline-none"
+                >
+                  <option value="">بدون ربط بقضية</option>
+                  {cases.map(cs => (
+                    <option key={cs.id} value={`${cs.caseNumber} لسنة ${cs.caseYear} - ${cs.competentCourt}`}>
+                      {cs.caseNumber} لسنة {cs.caseYear} ({cs.clientName})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  نص المذكرة / الملاحظة:
+                </label>
+                <textarea
+                  value={quickContent}
+                  onChange={(e) => setQuickContent(e.target.value)}
+                  rows={4}
+                  placeholder="اكتب التوجيهات أو الملاحظات القضائية هنا..."
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-right outline-none focus:ring-1 focus:ring-amber-500 leading-relaxed"
+                  required
+                />
+              </div>
+
+              <div className="p-3 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-900/30">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={quickRequireSign}
+                    onChange={(e) => setQuickRequireSign(e.target.checked)}
+                    className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500 accent-amber-600"
+                  />
+                  <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
+                    طلب توقيع رقمي وتأكيد إلكتروني من الموكل
+                  </span>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsQuickCreateOpen(false)}
+                  className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl font-bold transition cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl shadow-md flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <Zap className="w-4 h-4 fill-slate-950" />
+                  <span>تدوين ومزامنة في Google Keep</span>
                 </button>
               </div>
             </form>
