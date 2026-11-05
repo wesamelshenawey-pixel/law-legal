@@ -2,6 +2,8 @@ services:
   web:
     image: node:22-bookworm-slim
     working_dir: /app
+    # Startup script validates env vars before the app runs.
+    user: root
     labels:
       base44.project: "Wesam Legal App"
       base44.kind: "web"
@@ -24,6 +26,7 @@ services:
       - ./.env.base44-defaults
       - /run/base44/app.env
     command:
+      - /app/docker/startup.sh
       - sh
       - -ec
       - |

@@ -13,6 +13,13 @@ docker compose -f docker-compose.base44.yml logs -f web
 - `node:22-bookworm-slim` + source bind-mounted; `node_modules` lives in a named volume and is installed from `package-lock.json` (`npm ci`) at container start.
 - The container runs the dev server, not the production build, so edits hot-reload through Vite HMR. Changes to `server.ts` require `docker compose restart web` (`tsx` is not started in watch mode).
 
+## Environment check
+- `docker/startup.sh` is the container entrypoint (Compose runs it as root via `user: root`). It runs before `npm ci` and `npm run dev`.
+- Missing `REQUIRED_VARS` print a "STARTUP ABORTED" block and exit 1. `REQUIRED_VARS` is empty today because `server.ts` falls back to defaults for every variable it reads.
+- Missing `RECOMMENDED_VARS` (currently `GEMINI_API_KEY`) print a warning only: the app starts, but AI chat/OCR/drafting stay disabled.
+- Override the lists for one-off checks: `docker compose -f docker-compose.base44.yml exec -T -e REQUIRED_VARS=GEMINI_API_KEY web /app/docker/startup.sh true`.
+- `tests/startup-env-check.sh` verifies the abort/pass/warning paths, the executable bit and that Compose runs the container as root.
+
 ## Gotchas learned the hard way
 - **`package-lock.json` and `package.json` must stay in sync.** A commit once trimmed the lockfile and dropped `react-qr-code` from `package.json` while the source imported it — `npm ci` aborted with `Missing: <pkg> from lock file`, then the dev server failed on `Failed to resolve import`. If `npm ci` reports missing packages, regenerate with `npm install --package-lock-only` and commit the result.
 - `bun.lock` is present but stale/not used by Compose or CI; never treat it as the source of truth for dependencies.
