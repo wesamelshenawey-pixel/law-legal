@@ -9,6 +9,7 @@ import {
   onSnapshot
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
+import firebaseConfig from "../../firebase-applet-config.json";
 import { 
   PlatformUser, 
   ClientProfile, 
@@ -18,6 +19,11 @@ import {
   EmailNotificationRecord,
   OpponentProfile
 } from "../types";
+
+// Cloud sync is optional: the repository ships a masked Firebase API key, so
+// attempting Firestore reads/writes with it only produces failing retry
+// channels that slow the UI down. Local storage remains the source of truth.
+export const isFirebaseConfigured = /^AIza[\w-]+$/.test(String((firebaseConfig as any)?.apiKey || ""));
 
 export enum OperationType {
   CREATE = 'create',
@@ -122,6 +128,7 @@ export const INITIAL_LICENSES: License[] = [
 // Validate connection to Firestore on initialization
 // -------------------------------------------------------------------------
 export async function testFirebaseConnection(): Promise<boolean> {
+  if (!isFirebaseConfigured) return false;
   try {
     const testDocRef = doc(db, 'users', 'ping');
     await getDocFromServer(testDocRef);
@@ -147,6 +154,7 @@ export async function testFirebaseConnection(): Promise<boolean> {
 
 // USERS
 export async function dbSaveUser(user: PlatformUser): Promise<void> {
+  if (!isFirebaseConfigured) return;
   try {
     await setDoc(doc(db, "users", user.phone), user);
   } catch (e) {
@@ -155,6 +163,7 @@ export async function dbSaveUser(user: PlatformUser): Promise<void> {
 }
 
 export async function dbLoadUsers(): Promise<PlatformUser[]> {
+  if (!isFirebaseConfigured) return [];
   try {
     const snapshot = await getDocs(collection(db, "users"));
     const list: PlatformUser[] = [];
@@ -169,6 +178,7 @@ export async function dbLoadUsers(): Promise<PlatformUser[]> {
 
 // CLIENTS
 export async function dbSaveClient(client: ClientProfile): Promise<void> {
+  if (!isFirebaseConfigured) return;
   try {
     await setDoc(doc(db, "clients", client.id), client);
   } catch (e) {
@@ -177,6 +187,7 @@ export async function dbSaveClient(client: ClientProfile): Promise<void> {
 }
 
 export async function dbLoadClients(): Promise<ClientProfile[]> {
+  if (!isFirebaseConfigured) return [];
   try {
     const snapshot = await getDocs(collection(db, "clients"));
     const list: ClientProfile[] = [];
@@ -190,6 +201,7 @@ export async function dbLoadClients(): Promise<ClientProfile[]> {
 }
 
 export async function dbDeleteClient(clientId: string): Promise<void> {
+  if (!isFirebaseConfigured) return;
   try {
     await deleteDoc(doc(db, "clients", clientId));
   } catch (e) {
@@ -199,6 +211,7 @@ export async function dbDeleteClient(clientId: string): Promise<void> {
 
 // OPPONENTS
 export async function dbSaveOpponent(opponent: OpponentProfile): Promise<void> {
+  if (!isFirebaseConfigured) return;
   try {
     await setDoc(doc(db, "opponents", opponent.id), opponent);
   } catch (e) {
@@ -207,6 +220,7 @@ export async function dbSaveOpponent(opponent: OpponentProfile): Promise<void> {
 }
 
 export async function dbLoadOpponents(): Promise<OpponentProfile[]> {
+  if (!isFirebaseConfigured) return [];
   try {
     const snapshot = await getDocs(collection(db, "opponents"));
     const list: OpponentProfile[] = [];
@@ -221,6 +235,7 @@ export async function dbLoadOpponents(): Promise<OpponentProfile[]> {
 
 // CASES
 export async function dbSaveCase(cse: CaseRecord): Promise<void> {
+  if (!isFirebaseConfigured) return;
   try {
     await setDoc(doc(db, "cases", cse.id), cse);
   } catch (e) {
@@ -229,6 +244,7 @@ export async function dbSaveCase(cse: CaseRecord): Promise<void> {
 }
 
 export async function dbLoadCases(): Promise<CaseRecord[]> {
+  if (!isFirebaseConfigured) return [];
   try {
     const snapshot = await getDocs(collection(db, "cases"));
     const list: CaseRecord[] = [];
@@ -242,6 +258,7 @@ export async function dbLoadCases(): Promise<CaseRecord[]> {
 }
 
 export async function dbDeleteCase(caseId: string): Promise<void> {
+  if (!isFirebaseConfigured) return;
   try {
     await deleteDoc(doc(db, "cases", caseId));
   } catch (e) {
@@ -251,6 +268,7 @@ export async function dbDeleteCase(caseId: string): Promise<void> {
 
 // SESSIONS
 export async function dbSaveSession(sess: SessionRecord): Promise<void> {
+  if (!isFirebaseConfigured) return;
   try {
     await setDoc(doc(db, "sessions", sess.id), sess);
   } catch (e) {
@@ -259,6 +277,7 @@ export async function dbSaveSession(sess: SessionRecord): Promise<void> {
 }
 
 export async function dbLoadSessions(): Promise<SessionRecord[]> {
+  if (!isFirebaseConfigured) return [];
   try {
     const snapshot = await getDocs(collection(db, "sessions"));
     const list: SessionRecord[] = [];
@@ -272,6 +291,7 @@ export async function dbLoadSessions(): Promise<SessionRecord[]> {
 }
 
 export async function dbDeleteSession(sessionId: string): Promise<void> {
+  if (!isFirebaseConfigured) return;
   try {
     await deleteDoc(doc(db, "sessions", sessionId));
   } catch (e) {
@@ -281,6 +301,7 @@ export async function dbDeleteSession(sessionId: string): Promise<void> {
 
 // LICENSES
 export async function dbSaveLicense(lic: License): Promise<void> {
+  if (!isFirebaseConfigured) return;
   try {
     await setDoc(doc(db, "licenses", lic.id), lic);
   } catch (e) {
@@ -289,6 +310,7 @@ export async function dbSaveLicense(lic: License): Promise<void> {
 }
 
 export async function dbLoadLicenses(): Promise<License[]> {
+  if (!isFirebaseConfigured) return [];
   try {
     const snapshot = await getDocs(collection(db, "licenses"));
     const list: License[] = [];
@@ -303,6 +325,7 @@ export async function dbLoadLicenses(): Promise<License[]> {
 
 // ACTIVATION REQUESTS
 export async function dbSaveActivationRequest(req: ActivationRequest): Promise<void> {
+  if (!isFirebaseConfigured) return;
   try {
     await setDoc(doc(db, "activation_requests", req.id), req);
   } catch (e) {
@@ -311,6 +334,7 @@ export async function dbSaveActivationRequest(req: ActivationRequest): Promise<v
 }
 
 export async function dbLoadActivationRequests(): Promise<ActivationRequest[]> {
+  if (!isFirebaseConfigured) return [];
   try {
     const snapshot = await getDocs(collection(db, "activation_requests"));
     const list: ActivationRequest[] = [];
@@ -325,6 +349,7 @@ export async function dbLoadActivationRequests(): Promise<ActivationRequest[]> {
 
 // LEADS
 export async function dbSaveLead(lead: LeadProfile): Promise<void> {
+  if (!isFirebaseConfigured) return;
   try {
     await setDoc(doc(db, "leads", lead.id), lead);
   } catch (e) {
@@ -333,6 +358,7 @@ export async function dbSaveLead(lead: LeadProfile): Promise<void> {
 }
 
 export async function dbLoadLeads(): Promise<LeadProfile[]> {
+  if (!isFirebaseConfigured) return [];
   try {
     const snapshot = await getDocs(collection(db, "leads"));
     const list: LeadProfile[] = [];
@@ -359,6 +385,7 @@ export interface SyncedContactDoc {
 }
 
 export async function dbSaveSyncedContacts(contacts: SyncedContactDoc[]): Promise<void> {
+  if (!isFirebaseConfigured) return;
   try {
     // Save in batches or item-by-item
     for (const c of contacts.slice(0, 50)) {
@@ -371,6 +398,7 @@ export async function dbSaveSyncedContacts(contacts: SyncedContactDoc[]): Promis
 }
 
 export async function dbLoadSyncedContacts(): Promise<SyncedContactDoc[]> {
+  if (!isFirebaseConfigured) return [];
   try {
     const snapshot = await getDocs(collection(db, "synced_contacts"));
     const list: SyncedContactDoc[] = [];
@@ -385,6 +413,7 @@ export async function dbLoadSyncedContacts(): Promise<SyncedContactDoc[]> {
 
 // EMAIL NOTIFICATIONS
 export async function dbSaveEmailNotification(notif: EmailNotificationRecord): Promise<void> {
+  if (!isFirebaseConfigured) return;
   try {
     await setDoc(doc(db, "email_notifications", notif.id), notif);
   } catch (e) {
@@ -393,6 +422,7 @@ export async function dbSaveEmailNotification(notif: EmailNotificationRecord): P
 }
 
 export async function dbLoadEmailNotifications(): Promise<EmailNotificationRecord[]> {
+  if (!isFirebaseConfigured) return [];
   try {
     const snapshot = await getDocs(collection(db, "email_notifications"));
     const list: EmailNotificationRecord[] = [];
@@ -415,6 +445,7 @@ export function subscribeToCloudChanges(callbacks: {
   onUsersChange?: (users: PlatformUser[]) => void;
   onOpponentsChange?: (opponents: OpponentProfile[]) => void;
 }): () => void {
+  if (!isFirebaseConfigured) return () => {};
   const unsubscribers: (() => void)[] = [];
 
   try {

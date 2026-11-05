@@ -57,7 +57,8 @@ import {
   ShieldAlert,
   Map,
   MapPin,
-  PieChart as PieChartIcon
+  PieChart as PieChartIcon,
+  ClipboardList
 } from "lucide-react";
 import LawyerSignatureSeal from "./LawyerSignatureSeal";
 import RequestSignatureLinkModal from "./RequestSignatureLinkModal";
@@ -390,24 +391,37 @@ export default function DashboardView({
     }
     const newCase: CaseRecord = {
       id: "case-" + Date.now(),
+      serialNumber: cases.reduce((max, c) => Math.max(max, Number(c.serialNumber) || 0), 0) + 1,
       caseNumber: quickCaseNumber.trim(),
       caseYear: Number(quickCaseYear) || new Date().getFullYear(),
-      clientName: quickCaseClientName.trim(),
-      opponentName: quickCaseOpponentName.trim() || "غير محدد",
       competentCourt: quickCaseCourt,
-      circuit: quickCaseCircuit,
+      courtType: quickCaseCourt.includes("جنح")
+        ? "جنح"
+        : quickCaseCourt.includes("أسرة")
+        ? "أسرة"
+        : quickCaseCourt.includes("استئناف")
+        ? "استئناف"
+        : "ابتدائي",
       subject: quickCaseSubject.trim() || "دعوى جديدة",
+      clientName: quickCaseClientName.trim(),
+      clientPhone: clients.find(c => c.name.trim() === quickCaseClientName.trim())?.phone,
+      clientRole: "المدعي",
+      opponentName: quickCaseOpponentName.trim() || "غير محدد",
+      nextSessionDate: "",
       details: `تم إنشاء ملف القضية سريعاً عبر لوحة التحكم بتاريخ ${new Date().toLocaleDateString("ar-EG")}`,
-      status: "متداولة بالجلسات",
-      totalFees: 0,
-      paidFees: 0,
+      attachments: [],
+      scans: [],
+      stage: "registered",
+      status: "active",
       createdAt: new Date().toISOString(),
       timeline: [
         {
           id: "tl-" + Date.now(),
+          type: "registered",
           date: new Date().toISOString().split("T")[0],
           title: "قيد الدعوى وتسجيلها بالمنظومة",
-          court: quickCaseCourt,
+          status: "completed",
+          circuitOrCourt: quickCaseCircuit || quickCaseCourt,
           decisionOrNotes: "تم قيد الدعوى بالجدول وتحديد الدائرة المختصة."
         }
       ]
@@ -1198,10 +1212,10 @@ export default function DashboardView({
                           <span className="text-[10px] text-slate-400 font-mono">{sess.date}</span>
                         </div>
                         <p className="text-xs font-black text-white truncate group-hover/item:text-red-300 transition">
-                          قضية #{sess.caseNumber} - {sess.clientName}
+                          قضية #{sess.caseInfo?.caseNumber || "—"} - {sess.caseInfo?.clientName || "موكل"}
                         </p>
                         <p className="text-[11px] text-slate-400 truncate">
-                          {sess.court} • {sess.circuit || "الدائرة المختصة"}
+                          {sess.caseInfo?.competentCourt || "المحكمة المختصة"} • {sess.caseInfo?.circuit || "الدائرة المختصة"}
                         </p>
                       </div>
                       <span className="text-slate-500 group-hover/item:text-red-400 text-xs font-bold shrink-0 self-center">

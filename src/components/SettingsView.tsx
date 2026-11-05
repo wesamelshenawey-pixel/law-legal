@@ -22,6 +22,7 @@ import {
   KeyRound, 
   Plus, 
   CheckCircle, 
+  CheckCircle2,
   X, 
   ShieldAlert, 
   ShieldCheck, 
@@ -29,6 +30,8 @@ import {
   Users, 
   UserPlus, 
   RefreshCw,
+  Mail,
+  LogOut,
   Palette,
   Monitor,
   Building2,
@@ -145,7 +148,7 @@ export default function SettingsView({
   const [profileBarId, setProfileBarId] = useState(() => localStorage.getItem("law_user_bar_id") || "نقابة المحامين - قيد رقم 184592");
   const [profileOfficeAddress, setProfileOfficeAddress] = useState(() => localStorage.getItem("law_user_office_address") || "القاهرة / الزقازيق / الشرقية");
   const [profileAvatar, setProfileAvatar] = useState<string>(() => {
-    return localStorage.getItem("law_user_avatar") || currentUser.avatar || "";
+    return localStorage.getItem(`user_avatar_${currentUser.id}`) || localStorage.getItem("law_user_avatar") || currentUser.avatar || "";
   });
   const [profileScreenScale, setProfileScreenScale] = useState<string>(() => localStorage.getItem("law_screen_scale") || "90");
   const [profileFontScale, setProfileFontScale] = useState<string>(() => localStorage.getItem("law_font_scale") || "large");
@@ -160,12 +163,14 @@ export default function SettingsView({
       const base64 = ev.target?.result as string;
       setProfileAvatar(base64);
       localStorage.setItem("law_user_avatar", base64);
+      localStorage.setItem(`user_avatar_${currentUser.id}`, base64);
     };
     reader.readAsDataURL(file);
   };
 
   const handleSaveUserProfile = () => {
     localStorage.setItem("law_user_avatar", profileAvatar);
+    localStorage.setItem(`user_avatar_${currentUser.id}`, profileAvatar);
     localStorage.setItem("law_user_title", profileTitle);
     localStorage.setItem("law_user_bar_id", profileBarId);
     localStorage.setItem("law_user_office_address", profileOfficeAddress);

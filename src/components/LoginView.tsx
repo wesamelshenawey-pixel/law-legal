@@ -578,9 +578,14 @@ export default function LoginView({
                     />
                 </div>
                 {activeTab === UserRole.ADMIN && (
-                  <p className="text-[10px] text-amber-600 dark:text-amber-400 text-right mt-1 font-mono font-bold">
-                    هاتف المدير: 01283233555
-                  </p>
+                  <button
+                    type="button"
+                    onClick={handleQuickAdminFill}
+                    className="block w-full text-[10px] text-amber-600 dark:text-amber-400 text-right mt-1 font-mono font-bold hover:underline cursor-pointer"
+                    title={language === "ar" ? "تعبئة بيانات المدير تلقائياً" : "Autofill administrator credentials"}
+                  >
+                    {language === "ar" ? "هاتف المدير: 01283233555 (تعبئة سريعة)" : "Admin phone: 01283233555 (quick fill)"}
+                  </button>
                 )}
               </div>
 

@@ -229,6 +229,7 @@ export default function ContactsView({
 
     const newClient: ClientProfile = {
       id: "cli-" + Date.now(),
+      serialNumber: clients.length + 1,
       name: contact.name,
       phone: contact.phone,
       email: contact.email || "",
@@ -236,7 +237,15 @@ export default function ContactsView({
       nationalId: contact.nationalId || "",
       type: "individual",
       status: "active",
-      powerOfAttorneyNumber: "توكيل قيد الاستخراج",
+      poaNumber: "قيد الاستخراج",
+      poaLetter: "أ",
+      poaYear: new Date().getFullYear(),
+      poaOffice: "قيد التوثيق",
+      caseNumber: "",
+      caseYear: new Date().getFullYear(),
+      competentCourt: "",
+      subject: "",
+      remainingFees: 0,
       createdAt: new Date().toISOString(),
       notes: contact.notes ? `منقول من دليل جهات الاتصال: ${contact.notes}` : "تم تحويله من دليل جهات الاتصال إلى موكل رسمي بالديوان",
       casesCount: 0

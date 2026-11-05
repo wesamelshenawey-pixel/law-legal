@@ -162,6 +162,7 @@ export interface PlatformUser {
   role: UserRole;
   isVerified: boolean;   // تأكيد ملكية رقم الهاتف
   email?: string;        // البريد الإلكتروني للمستخدم
+  avatar?: string;       // الصورة الشخصية (Base64)
   googleAccount?: string;
   facebookAccount?: string;
   whatsAppAccount?: string;
@@ -197,6 +198,8 @@ export interface ClientProfile {
   code?: string;         // كود الموكل الفريد (مثال: CL-2026-0042)
   serialNumber: number;  // رقم مسلسل لمعرفة عدد الموكلين
   name: string;          // الاسم رباعياً
+  type?: "individual" | "company"; // نوع الموكل (فرد / شركة)
+  casesCount?: number;   // عدد القضايا المرتبطة (كشف سريع)
   firstName?: string;    // الاسم الأول
   fatherName?: string;   // اسم الأب
   grandfatherName?: string; // اسم الجد (اختياري)
@@ -238,6 +241,7 @@ export interface ClientProfile {
     fetchedData?: any;
   };
   remainingFees: number; // باقي الأتعاب
+  notes?: string;        // ملاحظات إدارية عن الموكل
   avatar?: string;       // الصورة الشخصية للموكل
   personalDocuments?: { id: string; name: string; fileBase64: string; addedAt: string }[];
   status?: "active" | "archived";
@@ -249,6 +253,7 @@ export interface OpponentProfile {
   code?: string;         // كود الخصم الفريد (مثال: OP-2026-0018)
   name: string;
   phone?: string;
+  address?: string;
   nationalId?: string;
   lawyerName?: string;
   lawyerPhone?: string;
@@ -294,6 +299,7 @@ export interface CaseRecord {
   courtType: string;    // نوع المحكمة (أسرة، جنح، إلخ)
   subject: string;      // اتهام / موضوع
   clientName: string;   // اسم الموكل ( dropdown من قسم الموكلين )
+  clientPhone?: string; // هاتف الموكل (لربط حساب الموكل بقضاياه)
   clientRole: string;   // صفة الموكل (مدعي، متهم، إلخ)
   opponentName: string; // اسم الخصم
   nextSessionDate: string; // تاريخ الجلسة القادمة (YYYY-MM-DD)

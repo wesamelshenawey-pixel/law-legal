@@ -147,7 +147,8 @@ import {
   dbSaveLead,
   dbLoadLeads,
   testFirebaseConnection,
-  subscribeToCloudChanges
+  subscribeToCloudChanges,
+  isFirebaseConfigured
 } from "./utils/firebaseSync";
 import { TRANSLATIONS } from "./utils/translations";
 import { requestWorkspaceAuth, getStoredWorkspaceToken, uploadFileToGoogleDrive, fetchGoogleDriveFiles, downloadGoogleDriveFileAsBase64 } from "./utils/workspaceService";
@@ -163,6 +164,15 @@ const ACCENT_PALETTES: Record<string, Record<number, string>> = {
   indigo: { 50: '#eef2ff', 100: '#e0e7ff', 200: '#c7d2fe', 300: '#a5b4fc', 400: '#818cf8', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca', 800: '#3730a3', 900: '#312e81', 950: '#1e1b4b' },
   orange: { 50: '#fff7ed', 100: '#ffedd5', 200: '#fed7aa', 300: '#fdba74', 400: '#fb923c', 500: '#f97316', 600: '#ea580c', 700: '#c2410c', 800: '#9a3412', 900: '#7c2d12', 950: '#431407' },
   cyan: { 50: '#ecfeff', 100: '#cffafe', 200: '#a5f3fc', 300: '#67e8f9', 400: '#22d3ee', 500: '#06b6d4', 600: '#0891b2', 700: '#0e7490', 800: '#155e75', 900: '#164e63', 950: '#083344' }
+};
+
+// Master administrator is recognised regardless of the phone format stored
+// on the account (local "01283233555" or international "+201283233555").
+const MASTER_ADMIN_PHONE = "01283233555";
+
+const normalizeEgyptPhone = (phone?: string) => {
+  const digits = (phone || "").replace(/\D/g, "");
+  return digits.startsWith("20") && digits.length === 12 ? "0" + digits.slice(2) : digits;
 };
 
 export default function App() {
@@ -823,11 +833,11 @@ export default function App() {
   // ----------------------------------------------------
   const isCopyLicensedOnThisDevice = () => {
     // Wesam Al-Shenawey master administrator bypasses all device locks
-    if (currentUser?.phone === "01283233555") return true;
+    if (normalizeEgyptPhone(currentUser?.phone) === MASTER_ADMIN_PHONE) return true;
 
     const matchedLic = licenses.find(l => l.id === activeLicenseKey);
     if (matchedLic && matchedLic.status === "active") {
-      return matchedLic.approvedDevices.includes(deviceFingerprint);
+      return (matchedLic.approvedDevices || []).includes(deviceFingerprint);
     }
     return false;
   };
@@ -1573,7 +1583,7 @@ export default function App() {
     if (!isClientRole) return sessions;
     return sessions.filter(s => 
       accessibleCaseIds.has(s.caseId) ||
-      (s.clientName && currentUser.name && s.clientName.trim().toLowerCase() === currentUser.name.trim().toLowerCase())
+      (s.caseInfo?.clientName && currentUser.name && s.caseInfo.clientName.trim().toLowerCase() === currentUser.name.trim().toLowerCase())
     );
   }, [sessions, accessibleCaseIds, currentUser, isClientRole]);
 
@@ -2039,7 +2049,7 @@ export default function App() {
   }
 
   // 2. IF LOGGED IN BUT MACHINE IS UNLICENSED, REQUIRE ACTIVATION (Bypassed if user phone is general Admin Wesam)
-  const isMasterAdmin = currentUser.phone === "01283233555";
+  const isMasterAdmin = normalizeEgyptPhone(currentUser.phone) === MASTER_ADMIN_PHONE;
   if (!isCopyLicensedOnThisDevice() && !isMasterAdmin) {
     return (
       <LicensingGate
@@ -2214,9 +2224,17 @@ export default function App() {
                   ? "bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-300"
                   : offlinePendingCount > 0
                   ? "bg-blue-500/10 border-blue-500/30 text-blue-900 dark:text-blue-300"
+                  : !isFirebaseConfigured
+                  ? "bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-300"
                   : "bg-emerald-500/10 border-emerald-500/30 text-emerald-900 dark:text-emerald-300"
               }`}
-              title={!isOnline ? "النظام يعمل حالياً في وضع عدم الاتصال بالإنترنت مع حفظ محلي كامل" : "النظام متصل بالسحابة ومتزامن"}
+              title={
+                !isOnline
+                  ? "النظام يعمل حالياً في وضع عدم الاتصال بالإنترنت مع حفظ محلي كامل"
+                  : !isFirebaseConfigured
+                  ? "جميع البيانات محفوظة بأمان على هذا الجهاز. لم يتم إعداد مزامنة سحابية بعد."
+                  : "النظام متصل بالسحابة ومتزامن"
+              }
             >
               {!isOnline ? (
                 <>
@@ -2240,6 +2258,11 @@ export default function App() {
                   >
                     {isSyncingQueue ? "جاري..." : "مزامنة الآن"}
                   </button>
+                </>
+              ) : !isFirebaseConfigured ? (
+                <>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                  <span className="text-[10px]">{language === "ar" ? "حفظ محلي آمن" : "Secure Local"}</span>
                 </>
               ) : (
                 <>

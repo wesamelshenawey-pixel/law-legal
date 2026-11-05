@@ -1347,15 +1347,19 @@ ${c.details || "تم قيد ومتابعة الإجراءات القانونية
     const digitsOnly = cleanInput.replace(/\D/g, "");
     let formattedCaseNo = digitsOnly.length > 0 ? digitsOnly : (cleanInput || "1");
     
+    const resolvedClientName = clientName || (clients[0] ? clients[0].name : "أحمد محمد محمود عبد العال");
+    const resolvedClientPhone = clients.find(c => c.name.trim() === resolvedClientName.trim())?.phone;
+
     const newC: CaseRecord = {
       id: "cs-" + Date.now(),
-      serialNumber: cases.length + 1,
+      serialNumber: cases.reduce((max, c) => Math.max(max, Number(c.serialNumber) || 0), 0) + 1,
       caseNumber: formattedCaseNo,
       caseYear: parsedYear,
       competentCourt: finalCourt || "محكمة ههيا الجزئية",
       courtType: courtType,
       subject: finalSubject || "تبديد وإخلال بالأمانة",
-      clientName: clientName || (clients[0] ? clients[0].name : "أحمد محمد محمود عبد العال"),
+      clientName: resolvedClientName,
+      clientPhone: resolvedClientPhone,
       clientRole: clientRole,
       opponentName: finalOpponent || "جهة إدارية / مجهول",
       nextSessionDate: nextSession,
@@ -1363,6 +1367,8 @@ ${c.details || "تم قيد ومتابعة الإجراءات القانونية
       attachments: [],
       scans: [],
       estimatedFees: aiFeeRecommendation ? aiFeeRecommendation : undefined,
+      stage: "registered",
+      status: "active",
       createdAt: new Date().toISOString()
     };
 

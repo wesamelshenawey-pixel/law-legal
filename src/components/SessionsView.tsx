@@ -363,7 +363,6 @@ export default function SessionsView({
       caseId: "case-manual-" + Date.now(),
       date: newSessionDate,
       timeType: newTimeType,
-      time: newTimeType === "morning" ? "09:00 AM" : "12:00 PM",
       caseInfo: {
         caseNumber: newCaseNumber,
         caseYear: newCaseYear,
