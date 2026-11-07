@@ -39,6 +39,12 @@ interface WebAndSocialRollImporterModalProps {
   currentUser: PlatformUser;
   onImportExtracted: (sessions: SessionRecord[], cases: CaseRecord[]) => void;
   language?: "ar" | "en";
+  /** When true, every extracted case/session is added to the app immediately (no review step) */
+  autoImport?: boolean;
+  /** Facebook account/page linked to the current user */
+  connectedFacebookUrl?: string;
+  /** Court used for pasted roll text */
+  defaultCourtName?: string;
 }
 
 export default function WebAndSocialRollImporterModal({
@@ -46,12 +52,21 @@ export default function WebAndSocialRollImporterModal({
   onClose,
   currentUser,
   onImportExtracted,
-  language = "ar"
+  language = "ar",
+  autoImport = false,
+  connectedFacebookUrl = "",
+  defaultCourtName = "محكمة ههيا الجزئية"
 }: WebAndSocialRollImporterModalProps) {
-  const [activeTab, setActiveTab] = useState<"website" | "google_photos" | "facebook">("website");
+  const [activeTab, setActiveTab] = useState<"website" | "google_photos" | "facebook">(
+    autoImport ? "facebook" : "website"
+  );
   
   // URL Input
   const [webUrl, setWebUrl] = useState("");
+
+  // Court roll text pasted from a Facebook post
+  const [rollText, setRollText] = useState("");
+  const [rollCourtName, setRollCourtName] = useState(defaultCourtName);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -76,8 +91,8 @@ export default function WebAndSocialRollImporterModal({
 
   // Handle Web Scrape
   const handleScrapeWebsite = async () => {
-    if (!webUrl.trim() && selectedImages.length === 0) {
-      setErrorMsg("يرجى إدخال رابط الموقع أو رفع صور كشف الرول أولاً.");
+    if (!webUrl.trim() && selectedImages.length === 0 && !rollText.trim()) {
+      setErrorMsg("يرجى إدخال رابط منشور فيسبوك أو لصق نص كشف الرول أو رفع صور الكشف أولاً.");
       return;
     }
 
@@ -92,7 +107,9 @@ export default function WebAndSocialRollImporterModal({
         body: JSON.stringify({
           url: webUrl.trim(),
           directBase64Images: selectedImages,
-          platform: activeTab
+          platform: activeTab,
+          rollText,
+          courtName: rollCourtName
         })
       });
 
@@ -103,13 +120,26 @@ export default function WebAndSocialRollImporterModal({
 
       const data = resJson.data || {};
       const sessions = Array.isArray(data.sessions) ? data.sessions : [];
-      setExtractedData({
-        courtName: data.courtName || "المحكمة المختصة",
+      const nextData = {
+        courtName: data.courtName || rollCourtName || "المحكمة المختصة",
         circuit: data.circuit || "الدائرة القضائية",
         sessionDate: data.sessionDate || new Date().toISOString().split("T")[0],
         sessions: sessions,
         notes: data.notes
-      });
+      };
+      setExtractedData(nextData);
+
+      if (autoImport) {
+        // Add every extracted case and session to the app immediately
+        if (nextData.sessions.length === 0) {
+          setErrorMsg("لم يتم العثور على قضايا أو جلسات في كشف الرول. تأكد من نص الكشف أو الرابط.");
+          return;
+        }
+        const { sessions: newSessions, cases: newCases } = buildImportRecords(nextData);
+        onImportExtracted(newSessions, newCases);
+        onClose();
+        return;
+      }
 
       setSuccessMsg(`تم استخراج ${sessions.length} قضية وجلسة من كشف الرول بنجاح!`);
     } catch (err: any) {
@@ -187,15 +217,18 @@ export default function WebAndSocialRollImporterModal({
     }
   };
 
-  // Convert Extracted Sessions to System Records and Import
-  const handleConfirmImport = () => {
-    if (!extractedData || extractedData.sessions.length === 0) return;
-
+  // Convert Extracted Sessions to System Records
+  function buildImportRecords(data: {
+    courtName: string;
+    circuit: string;
+    sessionDate: string;
+    sessions: ExtractedRollSession[];
+  }) {
     const newSessions: SessionRecord[] = [];
     const newCases: CaseRecord[] = [];
     const baseTime = Date.now();
 
-    extractedData.sessions.forEach((s, idx) => {
+    data.sessions.forEach((s, idx) => {
       const caseId = `cs_web_${baseTime}_${idx}`;
       const sessionId = `ss_web_${baseTime}_${idx}`;
 
@@ -204,7 +237,7 @@ export default function WebAndSocialRollImporterModal({
         serialNumber: idx + 1,
         caseNumber: s.caseNumber || `${100 + idx}`,
         caseYear: Number(s.caseYear) || 2026,
-        competentCourt: s.court || extractedData.courtName || "محكمة ههيا الجزئية",
+        competentCourt: s.court || data.courtName || "محكمة ههيا الجزئية",
         courtType: "جنح",
         subject: s.subject || "قضية رول جلسة مستوردة",
         clientName: s.clientName || "موكل كشف الرول",
@@ -220,16 +253,16 @@ export default function WebAndSocialRollImporterModal({
       const newSession: SessionRecord = {
         id: sessionId,
         caseId: caseId,
-        date: extractedData.sessionDate || new Date().toISOString().split("T")[0],
+        date: data.sessionDate || new Date().toISOString().split("T")[0],
         timeType: "morning",
         caseInfo: {
           caseNumber: s.caseNumber || `${100 + idx}`,
           caseYear: Number(s.caseYear) || 2026,
-          competentCourt: s.court || extractedData.courtName || "محكمة ههيا الجزئية",
+          competentCourt: s.court || data.courtName || "محكمة ههيا الجزئية",
           subject: s.subject || "قضية رول جلسة",
           clientName: s.clientName || "موكل كشف الرول",
           opponentName: s.opponentName || "النيابة العامة",
-          circuit: s.circuit || extractedData.circuit || "الدائرة الأولى"
+          circuit: s.circuit || data.circuit || "الدائرة الأولى"
         },
         decision: s.decision || "نظرت بالجلسة",
         requiredWork: s.requiredWork || "متابعة القرار ومذكرات الدفاع",
@@ -241,6 +274,13 @@ export default function WebAndSocialRollImporterModal({
       newSessions.push(newSession);
     });
 
+    return { sessions: newSessions, cases: newCases };
+  }
+
+  // Import the extracted roll after reviewing it
+  const handleConfirmImport = () => {
+    if (!extractedData || extractedData.sessions.length === 0) return;
+    const { sessions: newSessions, cases: newCases } = buildImportRecords(extractedData);
     onImportExtracted(newSessions, newCases);
     onClose();
   };
@@ -450,9 +490,14 @@ export default function WebAndSocialRollImporterModal({
               {activeTab === "facebook" && (
                 <div className="space-y-4">
                   <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-2xl border border-blue-200 dark:border-blue-900 space-y-2">
-                    <label className="block text-xs font-bold text-blue-900 dark:text-blue-300">
-                      رابط منشور كشف الرول على فيسبوك أو جروب نقابة المحامين:
-                    </label>
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="block text-xs font-bold text-blue-900 dark:text-blue-300">
+                        رابط منشور كشف الرول على فيسبوك أو جروب نقابة المحامين:
+                      </label>
+                      <span className="text-[10px] font-black text-blue-800 dark:text-blue-300 bg-white/70 dark:bg-slate-900 px-2 py-0.5 rounded-lg border border-blue-200 dark:border-blue-800">
+                        فيسبوك المتصل: {connectedFacebookUrl || currentUser.facebookAccount || "غير مربوط"}
+                      </span>
+                    </div>
                     <input
                       type="url"
                       value={webUrl}
@@ -461,6 +506,30 @@ export default function WebAndSocialRollImporterModal({
                       dir="ltr"
                       className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-left outline-none focus:border-blue-500"
                     />
+                  </div>
+
+                  <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2">
+                    <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                      أو الصق نص كشف الرول من منشور فيسبوك (سطر لكل قضية):
+                    </label>
+                    <textarea
+                      value={rollText}
+                      onChange={(e) => setRollText(e.target.value)}
+                      rows={5}
+                      placeholder={"1. رول رقم 1 - جنحة 1024 لسنة 2026 - تهمة تبديد - قرار: حجز للحكم\n2. رول رقم 4 - جنحة 3420 لسنة 2026 - إيصال أمانة - قرار: تأجيل للمستندات"}
+                      className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none focus:border-blue-500 font-mono"
+                    />
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+                        المحكمة التي ستُضاف إليها الجلسات:
+                      </label>
+                      <input
+                        type="text"
+                        value={rollCourtName}
+                        onChange={(e) => setRollCourtName(e.target.value)}
+                        className="w-full px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none focus:border-blue-500"
+                      />
+                    </div>
                   </div>
 
                   <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-6 text-center space-y-3">
@@ -523,7 +592,7 @@ export default function WebAndSocialRollImporterModal({
               <button
                 type="button"
                 onClick={handleScrapeWebsite}
-                disabled={isLoading || (!webUrl.trim() && selectedImages.length === 0)}
+                disabled={isLoading || (!webUrl.trim() && selectedImages.length === 0 && !rollText.trim())}
                 className="w-full py-3.5 bg-gradient-to-l from-amber-500 via-amber-600 to-amber-500 hover:brightness-105 text-slate-950 font-black text-sm rounded-2xl shadow-lg transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 {isLoading ? (
@@ -534,7 +603,11 @@ export default function WebAndSocialRollImporterModal({
                 ) : (
                   <>
                     <Sparkles className="w-5 h-5" />
-                    <span>تحليل الموقع والصور واستخراج جدول القضايا والجلسات</span>
+                    <span>
+                      {autoImport
+                        ? "استخراج وإضافة كافة القضايا والجلسات فوراً إلى قسم الجلسات"
+                        : "تحليل الموقع والصور واستخراج جدول القضايا والجلسات"}
+                    </span>
                   </>
                 )}
               </button>

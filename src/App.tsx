@@ -1479,6 +1479,56 @@ export default function App() {
     }
   };
 
+  // Facebook court-roll agent: add every extracted case & session immediately
+  const handleImportFacebookExtracted = (newSessions: SessionRecord[], newCases: CaseRecord[]) => {
+    const sessionKey = (s: SessionRecord) =>
+      `${s.caseInfo?.caseNumber}|${s.caseInfo?.caseYear}|${s.date}|${s.caseInfo?.competentCourt}`;
+
+    setSessions(prev => {
+      const existing = new Set(prev.map(sessionKey));
+      const added = newSessions.filter(s => {
+        const key = sessionKey(s);
+        if (existing.has(key)) return false;
+        existing.add(key);
+        return true;
+      });
+      return [...added, ...prev];
+    });
+
+    setCases(prev => {
+      const existing = new Set(prev.map(c => `${c.caseNumber}|${c.caseYear}|${c.competentCourt}`));
+      const added = newCases.filter(c => {
+        const key = `${c.caseNumber}|${c.caseYear}|${c.competentCourt}`;
+        if (existing.has(key)) return false;
+        existing.add(key);
+        return true;
+      });
+      return [...added, ...prev];
+    });
+
+    // Mirror the extracted sessions into a "جلسات محكمة ههيا" custom section when one exists
+    setCustomSections(prev => prev.map(sec => {
+      const sectionName = `${sec.nameArabic || ""} ${sec.nameEnglish || ""}`;
+      if (!sectionName.includes("ههيا") || !sectionName.includes("جلس")) return sec;
+      const records = newSessions.map((s, idx) => ({
+        id: `fb_rec_${Date.now()}_${idx}`,
+        createdAt: new Date().toISOString().split("T")[0],
+        createdBy: currentUser?.name || "مزامنة فيسبوك",
+        "العنوان / الموضوع": s.caseInfo?.subject || "قضية من كشف فيسبوك",
+        "التاريخ": s.date,
+        "الحالة": "مستورد من فيسبوك",
+        "ملاحظات": `${s.caseInfo?.competentCourt || ""} - قضية ${s.caseInfo?.caseNumber || ""} لسنة ${s.caseInfo?.caseYear || ""} - ${s.decision || ""}`,
+        caseNumber: s.caseInfo?.caseNumber,
+        court: s.caseInfo?.competentCourt,
+        clientName: s.caseInfo?.clientName,
+        opponentName: s.caseInfo?.opponentName,
+        decision: s.decision,
+        source: "facebook"
+      }));
+      return { ...sec, records: [...records, ...(sec.records || [])] };
+    }));
+  };
+
   const handleUpdateSessionStatus = (id: string, nextDate: string, adjournmentReason: string) => {
     setSessions(prev => prev.map(s => {
       if (s.id === id) {
@@ -1726,6 +1776,7 @@ export default function App() {
             fees={fees}
             onAddFeePayment={handleAddFeeTransfer}
             onAddSession={(newSess) => setSessions(prev => [newSess, ...prev])}
+            onImportFacebookExtracted={handleImportFacebookExtracted}
           />
         );
       case "cases":

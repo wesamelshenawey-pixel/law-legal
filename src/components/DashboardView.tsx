@@ -57,6 +57,7 @@ import {
   ShieldAlert,
   Map,
   MapPin,
+  ClipboardList,
   PieChart as PieChartIcon
 } from "lucide-react";
 import LawyerSignatureSeal from "./LawyerSignatureSeal";

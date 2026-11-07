@@ -29,9 +29,11 @@ import {
   Send,
   Download,
   AlertCircle,
-  Scan
+  Scan,
+  Facebook
 } from "lucide-react";
 import { SectionDedicatedOcrModal } from "./SectionDedicatedOcrModal";
+import WebAndSocialRollImporterModal from "./WebAndSocialRollImporterModal";
 
 export interface AdministrativeTask {
   id: string;
@@ -68,6 +70,7 @@ interface SessionsViewProps {
   fees?: FeeTransfer[];
   onAddFeePayment?: (fee: FeeTransfer) => void;
   onAddSession?: (newSession: SessionRecord) => void;
+  onImportFacebookExtracted?: (sessions: SessionRecord[], cases: CaseRecord[]) => void;
   language?: "ar" | "en";
 }
 
@@ -80,8 +83,12 @@ export default function SessionsView({
   fees = [],
   onAddFeePayment,
   onAddSession,
+  onImportFacebookExtracted,
   language = "ar"
 }: SessionsViewProps) {
+  // Facebook connected court-roll sync
+  const [isFacebookSyncOpen, setIsFacebookSyncOpen] = useState(false);
+  const [facebookSyncMsg, setFacebookSyncMsg] = useState<string | null>(null);
   // View mode switcher
   const [activeTab, setActiveTab] = useState<"calendar" | "agenda" | "dashboard" | "admin_tasks" | "police_records">("calendar");
 
@@ -409,6 +416,16 @@ export default function SessionsView({
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           <button
+            id="btn-facebook-sessions-sync"
+            onClick={() => setIsFacebookSyncOpen(true)}
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-xs font-black shadow-md transition cursor-pointer"
+            title="استخراج وإضافة كافة القضايا والجلسات من فيسبوك المتصل فوراً إلى قسم الجلسات"
+          >
+            <Facebook className="w-4 h-4 text-blue-200" />
+            <span>مزامنة فيسبوك المتصل (Agent)</span>
+          </button>
+
+          <button
             id="btn-lexmark-ocr-sessions"
             onClick={() => setIsSessionsOcrOpen(true)}
             className="flex items-center gap-1.5 px-4 py-2.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-900 dark:text-amber-300 border border-amber-500/40 rounded-2xl text-xs font-black shadow-xs transition cursor-pointer active:scale-95"
@@ -449,6 +466,23 @@ export default function SessionsView({
           </button>
         </div>
       </div>
+
+      {/* Facebook sync result banner */}
+      {facebookSyncMsg && (
+        <div className="p-3.5 rounded-2xl bg-blue-50 dark:bg-blue-950/30 border border-blue-300 dark:border-blue-800 text-xs font-black text-blue-800 dark:text-blue-300 flex items-center justify-between gap-3">
+          <span className="flex items-center gap-2">
+            <Facebook className="w-4 h-4 shrink-0" />
+            <span>{facebookSyncMsg}</span>
+          </span>
+          <button
+            onClick={() => setFacebookSyncMsg(null)}
+            className="p-1 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900 transition cursor-pointer"
+            aria-label="إغلاق"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* 2. NAVIGATION TABS (Merged Calendar & Agenda / Alerts Dashboard / Admin / Police) */}
@@ -2003,6 +2037,25 @@ export default function SessionsView({
 
           </div>
         </div>
+      )}
+
+      {/* Facebook Connected Court-Roll Sync Agent */}
+      {isFacebookSyncOpen && (
+        <WebAndSocialRollImporterModal
+          isOpen={isFacebookSyncOpen}
+          onClose={() => setIsFacebookSyncOpen(false)}
+          currentUser={currentUser}
+          autoImport
+          connectedFacebookUrl={currentUser.facebookAccount}
+          defaultCourtName="محكمة ههيا الجزئية"
+          language={language}
+          onImportExtracted={(newSessions, newCases) => {
+            onImportFacebookExtracted?.(newSessions, newCases);
+            setFacebookSyncMsg(
+              `تمت إضافة ${newCases.length} قضية و ${newSessions.length} جلسة من فيسبوك المتصل إلى قسم جلسات محكمة ههيا فوراً.`
+            );
+          }}
+        />
       )}
 
       {/* Dedicated Section OCR Modal for Sessions & Roll */}

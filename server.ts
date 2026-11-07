@@ -2007,6 +2007,61 @@ app.post("/api/send-email-notification", async (req, res) => {
 });
 
 
+// Deterministic local parser for court roll text taken from a Facebook post (works without an AI key)
+function parseRollTextLocally(
+  rollText: string,
+  courtName: string,
+  circuit: string,
+  sessionDate: string
+) {
+  const lines = String(rollText || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 3);
+
+  const sessions: any[] = [];
+
+  lines.forEach((line, idx) => {
+    const caseMatch = line.match(/(\d{1,6})\s*(?:ل\s*سنة|لسنة|\/|\sسنة)\s*(\d{4})/);
+    if (!caseMatch) return;
+
+    const caseNumber = caseMatch[1];
+    const caseYear = Number(caseMatch[2]);
+    const rollMatch = line.match(/رول\s*رقم\s*(\d+)/) || line.match(/^(\d{1,3})\s*[.)\-]/);
+    const decisionMatch = line.match(/(?:قرار|القرار|الحكم)\s*:?\s*(.+)$/);
+    const dateMatch = line.match(/(\d{4}-\d{2}-\d{2})/);
+
+    let subject = line.slice((caseMatch.index || 0) + caseMatch[0].length);
+    if (decisionMatch) subject = subject.split(/(?:قرار|القرار|الحكم)\s*:?/)[0];
+    subject = subject.replace(/^[\s\-–|.]+/, "").replace(/[\s\-–|.]+$/, "").trim();
+
+    const decision = decisionMatch ? decisionMatch[1].trim() : "";
+
+    sessions.push({
+      rollNumber: rollMatch ? Number(rollMatch[1]) : idx + 1,
+      caseNumber,
+      caseYear,
+      court: courtName,
+      circuit,
+      clientName: "غير مسجل بكشف الرول",
+      opponentName: "غير محدد",
+      subject: subject || "قضية من كشف رول فيسبوك",
+      decision: decision || "نظرت بالجلسة",
+      nextSessionDate: dateMatch ? dateMatch[1] : "",
+      requiredWork: decision ? `تنفيذ قرار الجلسة: ${decision}` : "متابعة القضية بالجلسة القادمة"
+    });
+  });
+
+  return {
+    courtName,
+    circuit,
+    sessionDate,
+    totalCases: sessions.length,
+    sessions,
+    notes: "تم الاستخراج محلياً من نص كشف الرول المأخوذ من فيسبوك."
+  };
+}
+
 // Endpoint for Scraping Web Court URLs & Analyzing Roll Images (Facebook, Google Photos, Court Portals)
 app.post("/api/web/scrape-and-analyze-roll", async (req, res) => {
   try {
@@ -2014,7 +2069,11 @@ app.post("/api/web/scrape-and-analyze-roll", async (req, res) => {
       url, 
       directBase64Images = [], 
       targetKeywords = "",
-      platform = "generic_web"
+      platform = "generic_web",
+      rollText = "",
+      courtName = "محكمة ههيا الجزئية",
+      circuit = "الدائرة الأولى",
+      sessionDate = new Date().toISOString().split("T")[0]
     } = req.body;
 
     let imagesToAnalyze: { mimeType: string; data: string }[] = [];
@@ -2118,6 +2177,17 @@ app.post("/api/web/scrape-and-analyze-roll", async (req, res) => {
     }
 
     if (imagesToAnalyze.length === 0 && !pageTextSnippet) {
+      // Text pasted from a Facebook court-roll post: parse it directly (no AI key required)
+      if (typeof rollText === "string" && rollText.trim()) {
+        const localData = parseRollTextLocally(rollText, courtName, circuit, sessionDate);
+        return res.json({
+          success: true,
+          analyzedImagesCount: 0,
+          sourceUrl: null,
+          source: "local_text_parser",
+          data: localData
+        });
+      }
       return res.status(400).json({
         error: "لم يتم العثور على صور رول جلسات أو نصوص قضائية في الرابط المدخل. يرجى التأكد من الرابط أو رفع صورة كشف الرول مباشرة."
       });
@@ -2179,13 +2249,30 @@ app.post("/api/web/scrape-and-analyze-roll", async (req, res) => {
     }
     contents.push(extractionPrompt);
 
-    const geminiRes = await callGeminiApi({
-      contents,
-      config: {
-        systemInstruction: LAWYER_SYSTEM_INSTRUCTION,
-        responseMimeType: "application/json"
+    let geminiRes: any = null;
+    try {
+      geminiRes = await callGeminiApi({
+        contents,
+        config: {
+          systemInstruction: LAWYER_SYSTEM_INSTRUCTION,
+          responseMimeType: "application/json"
+        }
+      });
+    } catch (aiErr: any) {
+      // AI unavailable: fall back to the deterministic text parser when text is available
+      const textForParser = pageTextSnippet || rollText;
+      const localData = parseRollTextLocally(textForParser, courtName, circuit, sessionDate);
+      if (localData.sessions.length > 0) {
+        return res.json({
+          success: true,
+          analyzedImagesCount: imagesToAnalyze.length,
+          sourceUrl: url || null,
+          source: "local_text_parser",
+          data: localData
+        });
       }
-    });
+      throw aiErr;
+    }
 
     let parsedResult = null;
     try {
