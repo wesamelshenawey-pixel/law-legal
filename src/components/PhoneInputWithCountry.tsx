@@ -89,7 +89,8 @@ export default function PhoneInputWithCountry({
 
   const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
-    const cleanNum = raw.replace(/[^\d\s-]/g, "");
+    // Digits only: letters, spaces and symbols are rejected as they are typed/pasted.
+    const cleanNum = raw.replace(/\D/g, "");
     const full = cleanNum ? `${selectedCountry.code} ${cleanNum}`.trim() : "";
     onChange(full, selectedCountry.code, cleanNum);
   };
@@ -102,14 +103,14 @@ export default function PhoneInputWithCountry({
   );
 
   return (
-    <div className={`relative flex items-center w-full ${className}`} dir="ltr">
+    <div className={`relative flex items-stretch gap-2 w-full ${className}`} dir="ltr">
       {/* Country Code Dropdown Trigger */}
       <div className="relative flex-shrink-0">
         <button
           type="button"
           disabled={disabled}
           onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center gap-1.5 h-10 px-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-850 dark:text-slate-200 border border-slate-300 dark:border-slate-700 rounded-l-xl transition font-mono text-xs cursor-pointer select-none"
+          className="flex items-center gap-1.5 h-10 px-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-850 dark:text-slate-200 border border-slate-300 dark:border-slate-700 rounded-xl transition font-mono text-xs cursor-pointer select-none"
           title={`${selectedCountry.name} (${selectedCountry.code})`}
         >
           <span className="text-base leading-none">{selectedCountry.flag}</span>
@@ -167,13 +168,18 @@ export default function PhoneInputWithCountry({
       <input
         id={id}
         type="tel"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        autoComplete="tel-national"
+        maxLength={15}
         dir="ltr"
         disabled={disabled}
         required={required}
         value={nationalNumber}
         onChange={handleNumberChange}
         placeholder={placeholder || selectedCountry.formatPlaceholder}
-        className="flex-1 h-10 px-3 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-l-0 border-slate-300 dark:border-slate-700 rounded-r-xl font-mono text-xs outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition placeholder:text-slate-400"
+        title="أرقام فقط — Digits only"
+        className="flex-1 min-w-0 h-10 px-3 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl font-mono text-xs outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition placeholder:text-slate-400"
       />
     </div>
   );

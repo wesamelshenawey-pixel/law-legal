@@ -3,6 +3,16 @@ import PhoneInputWithCountry from "./PhoneInputWithCountry";
 import { PlatformUser, UserRole } from "../types";
 import { TRANSLATIONS } from "../utils/translations";
 import { License } from "../utils/firebaseSync";
+import { OWNER_PHONES, OWNER_PASSWORD, OWNER_NAME } from "../utils/ownerAccount";
+import {
+  buildFullPhone,
+  isValidEmail,
+  isValidFullName,
+  isValidNationalNumber,
+  phonesMatch,
+  sanitizePhoneDigits,
+  validateLoginFields
+} from "../utils/authValidation";
 import { 
   auth, 
   googleProvider, 
@@ -16,7 +26,6 @@ import {
   UserPlus, 
   Eye, 
   ShieldCheck, 
-  Mail, 
   CheckCircle, 
   Smartphone, 
   Globe, 
@@ -62,14 +71,6 @@ export default function LoginView({
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  // Quick autofill helper for admin
-  const handleQuickAdminFill = () => {
-    setPhoneCode("+20");
-    setPhone("1283233555");
-    setPassword("W-001*001");
-    setErrorMsg("");
-  };
-
   // When portal changes, set appropriate default role
   const handlePortalSwitch = (portal: "lawyers_admin" | "clients_users") => {
     setActivePortal(portal);
@@ -86,6 +87,7 @@ export default function LoginView({
   const [isSignUp, setIsSignUp] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
   const [signupName, setSignupName] = useState("");
+  const [signupEmail, setSignupEmail] = useState("");
   const [signupPhone, setSignupPhone] = useState("");
   const [signupPhoneCode, setSignupPhoneCode] = useState("+20");
   const [lawFirmPhone, setLawFirmPhone] = useState("");
@@ -131,38 +133,72 @@ export default function LoginView({
 
   const t = (key: string) => TRANSLATIONS[key]?.[language] || key;
 
-  // Regular Email/Phone + Password Login Handler
+  // Phone-only login handler: mobile number (with its own country code) + password.
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
-    
-    const fullPhone = phoneCode + phone;
+
+    const validation = validateLoginFields({
+      countryCode: phoneCode,
+      nationalNumber: phone,
+      password
+    });
+
+    if (!validation.valid) {
+      if (validation.reason === "phone_required") {
+        setErrorMsg(language === "ar"
+          ? "برجاء إدخال رقم الهاتف المحمول (أرقام فقط)."
+          : "Please enter your mobile number (digits only).");
+      } else if (validation.reason === "phone_invalid") {
+        setErrorMsg(language === "ar"
+          ? "رقم الهاتف غير صحيح: يجب أن يحتوي على أرقام فقط مع كود الدولة."
+          : "Invalid phone number: digits only, with a country code.");
+      } else {
+        setErrorMsg(language === "ar"
+          ? "برجاء إدخال كلمة المرور."
+          : "Please enter your password.");
+      }
+      return;
+    }
+
+    const fullPhone = validation.fullPhone;
+    const nationalNumber = sanitizePhoneDigits(phone);
+
+    // Account identification is the mobile number only (local or international form).
+    const matchesIdentity = (u: PlatformUser) =>
+      phonesMatch(u.phone, fullPhone) || phonesMatch(u.phone, nationalNumber);
 
     // Portal 1: Lawyers & Admin
     if (activePortal === "lawyers_admin") {
-      // Admin default direct validation matching credentials
-      if ((phone === "1283233555" || phone === "01283233555" || fullPhone === "+201283233555") && password === "W-001*001") {
-        const adminUser: PlatformUser = {
-          id: "usr-admin",
-          name: language === "ar" ? "مدير النظام (مكتب محامي رقمي)" : "System Admin (Digital Law Firm)",
-          phone: "+201283233555",
-          passwordHash: "W-001*001",
-          role: UserRole.ADMIN,
-          isVerified: true,
-          officeId: "office-admin",
-          createdAt: new Date().toISOString(),
-          permissions: {
-            canEditApp: true,
-            canAddSections: true
-          }
-        };
-        onLoginSuccess(adminUser);
+      // Owner master account
+      if (OWNER_PHONES.some((ownerPhone) => phonesMatch(ownerPhone, fullPhone))) {
+        if (password === OWNER_PASSWORD) {
+          const adminUser: PlatformUser = {
+            id: "usr-admin",
+            name: OWNER_NAME,
+            phone: "+201283233555",
+            passwordHash: OWNER_PASSWORD,
+            role: UserRole.ADMIN,
+            isVerified: true,
+            officeId: "office-admin",
+            createdAt: new Date().toISOString(),
+            permissions: {
+              canEditApp: true,
+              canAddSections: true
+            }
+          };
+          onLoginSuccess(adminUser);
+          return;
+        }
+        setErrorMsg(language === "ar"
+          ? "بيانات الدخول غير صحيحة للإدارة أو المحامين."
+          : "Credentials mismatch for Admin/Staff portal.");
         return;
       }
-      
+
       // Check for Admin/Staff users
       const matchedUser = registeredUsers.find(
-        (u) => (u.phone === fullPhone || u.phone === phone) && u.passwordHash === password && [UserRole.ADMIN, UserRole.STAFF].includes(u.role)
+        (u) => matchesIdentity(u) && u.passwordHash === password && [UserRole.ADMIN, UserRole.STAFF].includes(u.role)
       );
 
       if (matchedUser) {
@@ -183,10 +219,10 @@ export default function LoginView({
     // Portal 2: Clients & Users (Client, Seeker, Opponent roles)
     if (activePortal === "clients_users") {
       const matchedUser = registeredUsers.find(
-        (u) => (u.phone === fullPhone || u.phone === phone) && 
+        (u) => matchesIdentity(u) && 
                u.passwordHash === password && 
                [UserRole.CLIENT, UserRole.SEEKER, UserRole.OPPONENT].includes(u.role) &&
-               u.lawFirmPhone === (lawFirmPhoneCode + lawFirmPhone)
+               phonesMatch(u.lawFirmPhone, buildFullPhone(lawFirmPhoneCode, lawFirmPhone))
       );
 
       if (matchedUser) {
@@ -341,8 +377,24 @@ export default function LoginView({
       }
     }
 
-    if (signupPhone.length < 9) {
-      setErrorMsg(language === "ar" ? "يرجى كتابة رقم هاتف صحيح." : "Please enter a valid mobile phone.");
+    if (!isValidFullName(signupName)) {
+      setErrorMsg(language === "ar"
+        ? "يرجى كتابة الاسم الكامل بحروف فقط (3 أحرف على الأقل)."
+        : "Please enter a valid full name (letters only, at least 3 characters).");
+      return;
+    }
+
+    if (signupEmail.trim() && !isValidEmail(signupEmail)) {
+      setErrorMsg(language === "ar"
+        ? "صيغة البريد الإلكتروني غير صحيحة. مثال: name@example.com"
+        : "Invalid email format. Example: name@example.com");
+      return;
+    }
+
+    if (!isValidNationalNumber(signupPhone)) {
+      setErrorMsg(language === "ar"
+        ? "يرجى كتابة رقم هاتف صحيح (أرقام فقط) مع كود الدولة."
+        : "Please enter a valid mobile phone (digits only) with its country code.");
       return;
     }
 
@@ -387,6 +439,7 @@ export default function LoginView({
         id: "usr-" + Date.now(),
         name: signupName,
         phone: fullSignupPhone,
+        email: signupEmail.trim() || undefined,
         passwordHash: signupPassword,
         role: activeTab === UserRole.ADMIN ? UserRole.CLIENT : activeTab,
         isVerified: true,
@@ -549,6 +602,12 @@ export default function LoginView({
           {/* NORMAL LOGIN FRAME */}
           {!isSignUp ? (
             <form onSubmit={handleLoginSubmit} className="space-y-4">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed text-right">
+                {language === "ar"
+                  ? "تسجيل الدخول لجميع المستخدمين يتم برقم الهاتف المحمول فقط مع كود الدولة وكلمة المرور."
+                  : "All users sign in with their mobile number (country code + number) and password only."}
+              </p>
+
               {activePortal === "clients_users" && (
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 text-right mb-1">
@@ -577,11 +636,6 @@ export default function LoginView({
                       }}
                     />
                 </div>
-                {activeTab === UserRole.ADMIN && (
-                  <p className="text-[10px] text-amber-600 dark:text-amber-400 text-right mt-1 font-mono font-bold">
-                    هاتف المدير: 01283233555
-                  </p>
-                )}
               </div>
 
               <div>
@@ -731,6 +785,20 @@ export default function LoginView({
                           placeholder="الاسم ثلاثياً أو رباعياً"
                           className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none font-bold"
                           required
+                        />
+                      </div>
+                    )}
+
+                    {!(activePortal === "lawyers_admin" && wizardStep === 2) && (
+                      <div>
+                        <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">البريد الإلكتروني</label>
+                        <input
+                          type="email"
+                          dir="ltr"
+                          value={signupEmail}
+                          onChange={(e) => setSignupEmail(e.target.value)}
+                          placeholder="name@example.com"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 rounded-xl border border-slate-200 dark:border-slate-800 text-left outline-none font-bold"
                         />
                       </div>
                     )}

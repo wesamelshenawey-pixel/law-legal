@@ -22,6 +22,9 @@ import {
   KeyRound, 
   Plus, 
   CheckCircle, 
+  CheckCircle2,
+  Mail,
+  LogOut,
   X, 
   ShieldAlert, 
   ShieldCheck, 
@@ -139,8 +142,8 @@ export default function SettingsView({
 
   // User Profile & System Preferences State
   const [profileName, setProfileName] = useState(currentUser.name || "الأستاذ وسام الشناوي");
-  const [profilePhone, setProfilePhone] = useState(currentUser.phone || "01283233555");
-  const [profileEmail, setProfileEmail] = useState(currentUser.email || "wesam.elshenawey@gmail.com");
+  const [profilePhone, setProfilePhone] = useState(currentUser.phone || "");
+  const [profileEmail, setProfileEmail] = useState(currentUser.email || "");
   const [profileTitle, setProfileTitle] = useState(() => localStorage.getItem("law_user_title") || "المحامي بالنقض والدستورية العليا");
   const [profileBarId, setProfileBarId] = useState(() => localStorage.getItem("law_user_bar_id") || "نقابة المحامين - قيد رقم 184592");
   const [profileOfficeAddress, setProfileOfficeAddress] = useState(() => localStorage.getItem("law_user_office_address") || "القاهرة / الزقازيق / الشرقية");
