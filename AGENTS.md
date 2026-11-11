@@ -14,6 +14,9 @@ bind-mounts the repo, installs dependencies into a named `node_modules` volume, 
   so `npm ci` installed nothing and both `vite build` and the dev server failed to
   resolve the import. `bun.lock` has it — do not trust `bun.lock` as the source of truth
   for what is installed; CI runs `npm ci || npm install` against `package-lock.json`.
+- **Automated tests:** `npm test` runs Vitest (`vitest.config.ts`, jsdom). Suites cover
+  `src/utils/authValidation.ts` and the phone-only `LoginView` form. New devDependencies
+  (`vitest`, `jsdom`, `@testing-library/*`) are installed by the compose startup `npm install`.
 - **`npm run lint` (`tsc --noEmit`) already fails** with pre-existing type errors in
   `DashboardView`, `SettingsView`, `SessionsView`, `rbacAndSecurity`. It is not part of
   `npm run build`, so it does not block the app or CI. Do not gate a change on it.

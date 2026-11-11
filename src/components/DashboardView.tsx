@@ -2862,6 +2862,52 @@ export default function DashboardView({
                       </div>
                     )}
                   </div>
+
+                  {/* All OCR tools & skills, reachable from the dashboard */}
+                  <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm text-right">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-amber-500" />
+                        <h3 className="text-base font-black text-slate-900">أدوات ومهارات تحليل الصور (OCR) المتاحة في لوحة التحكم</h3>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onNavigate("smart_ocr")}
+                        className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-amber-400 text-xs font-black rounded-lg transition cursor-pointer"
+                      >
+                        فتح الاستوديو الكامل
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      اختر الصور التي تم تحليلها من الصور التي تم تحميلها من جهازك، وأضف بياناتها ومحتواها إلى القسم المختص مباشرة.
+                    </p>
+                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2.5">
+                      {[
+                        { label: "استخراج نصوص المستندات", icon: <ScanLine className="w-4 h-4 text-blue-500" /> },
+                        { label: "بطاقات الرقم القومي والهويات", icon: <UserCheck className="w-4 h-4 text-purple-500" /> },
+                        { label: "تحليل العقود والبنود", icon: <FileCheck2 className="w-4 h-4 text-emerald-500" /> },
+                        { label: "مقارنة المستندات", icon: <ArrowLeftRight className="w-4 h-4 text-indigo-500" /> },
+                        { label: "ترجمة المستندات", icon: <Sparkles className="w-4 h-4 text-amber-500" /> },
+                        { label: "تفريغ الخط اليدوي", icon: <PenTool className="w-4 h-4 text-rose-500" /> },
+                        { label: "فحص التوقيعات والأختام", icon: <ShieldCheck className="w-4 h-4 text-emerald-600" /> },
+                        { label: "التحليل الجنائي والبصمة الوراثية", icon: <Brain className="w-4 h-4 text-violet-500" /> },
+                        { label: "تقسيم الملفات متعددة الصفحات", icon: <Layers className="w-4 h-4 text-sky-500" /> },
+                        { label: "أرشفة وتصنيف المرفقات", icon: <ClipboardList className="w-4 h-4 text-slate-500" /> },
+                        { label: "المسح المباشر بالكاميرا", icon: <Camera className="w-4 h-4 text-orange-500" /> },
+                        { label: "البحث داخل المستندات", icon: <Search className="w-4 h-4 text-cyan-600" /> }
+                      ].map((tool) => (
+                        <button
+                          key={tool.label}
+                          type="button"
+                          onClick={() => onNavigate("smart_ocr")}
+                          className="flex items-center gap-2 p-2.5 bg-slate-50 hover:bg-amber-50/60 border border-slate-200 hover:border-amber-400 rounded-xl text-[11px] font-bold text-slate-700 transition text-right cursor-pointer"
+                        >
+                          {tool.icon}
+                          <span className="leading-snug">{tool.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
 

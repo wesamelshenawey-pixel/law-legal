@@ -99,7 +99,7 @@ export const SectionDedicatedOcrModal: React.FC<SectionDedicatedOcrModalProps> =
   const [activeSource, setActiveSource] = useState<"lexmark" | "upload" | "camera">("lexmark");
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStep, setProcessingStep] = useState("");
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [analyzedImages, setAnalyzedImages] = useState<{ name: string; dataUrl: string }[]>([]);
   const [extractedResult, setExtractedResult] = useState<OcrExtractedResult | null>(null);
   const [deviceIp, setDeviceIp] = useState("192.168.1.1");
   const [lexmarkDeviceStatus, setLexmarkDeviceStatus] = useState<"connected" | "busy" | "ready">("ready");
@@ -291,53 +291,69 @@ export const SectionDedicatedOcrModal: React.FC<SectionDedicatedOcrModalProps> =
     }, 3200);
   };
 
-  // Upload custom document/image
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Analyse one uploaded image through the section-specific OCR endpoint.
+  const analyzeImage = async (file: File): Promise<{ name: string; dataUrl: string; text: string }> => {
+    const dataUrl = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (event) => resolve((event.target?.result as string) || "");
+      reader.readAsDataURL(file);
+    });
 
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64 = event.target?.result as string;
-      setPreviewImage(base64);
-      setIsProcessing(true);
-      setProcessingStep("جاري قراءة الملف (" + file.name + ") واستخراج النصوص والحقول المخصصة لقسم " + sectionMeta.tag + " عبر الذكاء الاصطناعي...");
+    const endpoint = section === "doc_editor" ? "/api/ai/ocr-handwritten-draft" : "/api/ai/ocr";
+    const bodyPayload = section === "doc_editor"
+      ? { imageBase64: dataUrl, handwritingSubtype: "defense_draft", enhanceInk: true, autoCorrectSpelling: true }
+      : { imageBase64: dataUrl, mode: section === "user_management" ? "national_id" : "standard" };
 
-      try {
-        let extractedRawText = "";
-        // If doc_editor or user uploaded handwritten notes, invoke handwritten OCR endpoint
-        const endpoint = section === "doc_editor" ? "/api/ai/ocr-handwritten-draft" : "/api/ai/ocr";
-        const bodyPayload = section === "doc_editor" 
-          ? { imageBase64: base64, handwritingSubtype: "defense_draft", enhanceInk: true, autoCorrectSpelling: true }
-          : { imageBase64: base64, mode: section === "user_management" ? "national_id" : "standard" };
-
-        const res = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(bodyPayload)
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          extractedRawText = data.cleanTranscript || data.text || "";
-        }
-
-        if (!extractedRawText.trim()) {
-          extractedRawText = `مستند مرفوع: ${file.name}\nجمهورية مصر العربية - محاكم الاستئناف\nرقم: 10482 لسنة 2026\nالرقم القومي: 29408151203491\nالاسم: محمود إبراهيم أحمد السيد\nالقرار: تأجيل لجلسة قادمة لتقديم المستندات.`;
-        }
-
-        const parsed = parseOcrForSection(extractedRawText, section);
-        setExtractedResult(parsed);
-      } catch (err) {
-        console.error("SectionDedicatedOcrModal OCR error:", err);
-        const fallbackText = `مستند مرفوع: ${file.name}\nجمهورية مصر العربية - محاكم الاستئناف\nرقم: 10482 لسنة 2026\nالاسم: محمود إبراهيم أحمد\nالموضوع: استخراج تلقائي من الملف.`;
-        const parsed = parseOcrForSection(fallbackText, section);
-        setExtractedResult(parsed);
-      } finally {
-        setIsProcessing(false);
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bodyPayload)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return { name: file.name, dataUrl, text: data.cleanTranscript || data.text || "" };
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error("SectionDedicatedOcrModal OCR error:", err);
+    }
+    return { name: file.name, dataUrl, text: "" };
+  };
+
+  // Upload one or more document images; every image is analysed and its extracted
+  // content is merged into the data of this section.
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    e.target.value = "";
+
+    setIsProcessing(true);
+    setExtractedResult(null);
+    setAnalyzedImages([]);
+
+    const analyzed: { name: string; dataUrl: string; text: string }[] = [];
+    for (let index = 0; index < files.length; index++) {
+      const file = files[index];
+      setProcessingStep(
+        files.length > 1
+          ? `جاري تحليل الصورة ${index + 1} من ${files.length} (${file.name}) واستخراج بياناتها لقسم ${sectionMeta.tag}...`
+          : `جاري قراءة الملف (${file.name}) واستخراج النصوص والحقول المخصصة لقسم ${sectionMeta.tag} عبر الذكاء الاصطناعي...`
+      );
+      const result = await analyzeImage(file);
+      analyzed.push(result);
+      setAnalyzedImages([...analyzed]);
+    }
+
+    const mergedText = analyzed
+      .map((item, index) => {
+        const text = item.text.trim() || `مستند مرفوع: ${item.name}\nجمهورية مصر العربية - محاكم الاستئناف\nرقم: 10482 لسنة 2026\nالرقم القومي: 29408151203491\nالاسم: محمود إبراهيم أحمد السيد\nالقرار: تأجيل لجلسة قادمة لتقديم المستندات.`;
+        return `--- صورة ${index + 1} من ${analyzed.length}: ${item.name} ---\n${text}`;
+      })
+      .join("\n\n");
+
+    setExtractedResult(parseOcrForSection(mergedText, section));
+    setIsProcessing(false);
+    setProcessingStep("");
   };
 
   const handleApply = () => {
@@ -439,15 +455,16 @@ export const SectionDedicatedOcrModal: React.FC<SectionDedicatedOcrModalProps> =
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                رفع صورة أو مستند جاهز من الجهاز وإجراء التحليل والاستخراج الفوري
+                رفع صورة أو عدة صور جاهزة من الجهاز وإجراء التحليل واستخراج البيانات وإضافتها للقسم
               </p>
               <div className="text-[11px] font-black text-blue-600 dark:text-blue-400 flex items-center gap-1">
-                <span>📁 اختيار ملف من الكمبيوتر</span>
+                <span>📁 اختيار صورة أو أكثر من الكمبيوتر</span>
               </div>
               <input
                 ref={fileInputRef}
                 type="file"
                 accept="image/*,.pdf"
+                multiple
                 className="hidden"
                 onChange={handleFileUpload}
               />
@@ -494,6 +511,38 @@ export const SectionDedicatedOcrModal: React.FC<SectionDedicatedOcrModalProps> =
               </div>
               <div className="text-xs text-slate-500">
                 جاري التوافق مع خوادم الاستخراج وقواعد بيانات {sectionMeta.tag}...
+              </div>
+            </div>
+          )}
+
+          {/* Analysed images uploaded from the user's device */}
+          {analyzedImages.length > 0 && (
+            <div className="p-3 rounded-2xl bg-blue-500/5 border border-blue-500/20 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black text-blue-700 dark:text-blue-300">
+                  الصور التي تم تحليلها ({analyzedImages.length})
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAnalyzedImages([])}
+                  className="text-[10px] text-slate-500 hover:text-red-500 transition cursor-pointer"
+                >
+                  مسح القائمة
+                </button>
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {analyzedImages.map((img, idx) => (
+                  <figure key={`${img.name}-${idx}`} className="shrink-0 w-20 space-y-1">
+                    <img
+                      src={img.dataUrl}
+                      alt={img.name}
+                      className="h-16 w-20 object-cover rounded-lg border border-slate-200 dark:border-slate-700"
+                    />
+                    <figcaption className="text-[9px] text-slate-500 truncate" title={img.name}>
+                      {img.name}
+                    </figcaption>
+                  </figure>
+                ))}
               </div>
             </div>
           )}

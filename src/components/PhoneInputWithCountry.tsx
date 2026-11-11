@@ -89,7 +89,8 @@ export default function PhoneInputWithCountry({
 
   const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
-    const cleanNum = raw.replace(/[^\d\s-]/g, "");
+    // Digits only: letters, spaces and symbols are rejected as they are typed/pasted.
+    const cleanNum = raw.replace(/\D/g, "");
     const full = cleanNum ? `${selectedCountry.code} ${cleanNum}`.trim() : "";
     onChange(full, selectedCountry.code, cleanNum);
   };
@@ -167,12 +168,17 @@ export default function PhoneInputWithCountry({
       <input
         id={id}
         type="tel"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        autoComplete="tel-national"
+        maxLength={15}
         dir="ltr"
         disabled={disabled}
         required={required}
         value={nationalNumber}
         onChange={handleNumberChange}
         placeholder={placeholder || selectedCountry.formatPlaceholder}
+        title="أرقام فقط — Digits only"
         className="flex-1 min-w-0 h-10 px-3 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl font-mono text-xs outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition placeholder:text-slate-400"
       />
     </div>

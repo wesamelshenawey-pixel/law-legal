@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { MessageCircle, Facebook, Phone, Search, UserPlus, Send, Settings, User, Users, Tags } from "lucide-react";
 import { ClientProfile } from "../types";
+import PhoneInputWithCountry from "./PhoneInputWithCountry";
+import { isValidNationalNumber, toWhatsAppNumber } from "../utils/authValidation";
 
 interface Message {
   id: string;
@@ -25,6 +27,9 @@ export default function CommunicationsCenterView({ clients }: { clients: ClientP
   
   // Truecaller / Add Contact States
   const [searchNumber, setSearchNumber] = useState("");
+  const [searchNumberCode, setSearchNumberCode] = useState("+20");
+  const [waNewNumber, setWaNewNumber] = useState("");
+  const [waNewNumberCode, setWaNewNumberCode] = useState("+20");
   const [truecallerResult, setTruecallerResult] = useState<{name: string, number: string} | null>(null);
 
   useEffect(() => {
@@ -62,7 +67,7 @@ export default function CommunicationsCenterView({ clients }: { clients: ClientP
   };
 
   const handleTruecallerSearch = () => {
-    if (!searchNumber) return;
+    if (!isValidNationalNumber(searchNumber)) return;
     // Truecaller search is heavily restricted and typically requires their OAuth flow or a specific partner API.
     // For demo purposes, we mock a result.
     alert(`[Simulation] Connecting to Truecaller API to fetch data for ${searchNumber}...\n\nNote: Truecaller's public API is restricted. In production, use Truecaller SDK for Business or user verification.`);
@@ -227,18 +232,18 @@ export default function CommunicationsCenterView({ clients }: { clients: ClientP
               </div>
             </div>
 
-            <div className="flex gap-2">
-              <input 
-                type="tel"
-                value={searchNumber}
-                onChange={(e) => setSearchNumber(e.target.value)}
-                placeholder="أدخل رقم الهاتف..."
-                className="flex-1 bg-black/20 border border-white/20 rounded-xl px-4 py-2.5 text-sm text-white placeholder-blue-200 outline-none focus:border-white/50 text-left"
-                dir="ltr"
+            <div className="space-y-2">
+              <PhoneInputWithCountry
+                value={`${searchNumberCode}${searchNumber}`}
+                onChange={(_full, code, num) => {
+                  setSearchNumberCode(code);
+                  setSearchNumber(num);
+                }}
+                placeholder="010XXXXXXXX"
               />
               <button 
                 onClick={handleTruecallerSearch}
-                className="bg-white text-blue-600 hover:bg-blue-50 px-4 py-2.5 rounded-xl font-black text-sm transition"
+                className="w-full bg-white text-blue-600 hover:bg-blue-50 px-4 py-2.5 rounded-xl font-black text-sm transition"
               >
                 بحث
               </button>
@@ -279,17 +284,18 @@ export default function CommunicationsCenterView({ clients }: { clients: ClientP
             </div>
 
             <div className="space-y-3">
-              <input 
-                type="tel"
-                placeholder="+20 100 000 0000"
-                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-emerald-500 text-left"
-                dir="ltr"
-                id="wa_new_number"
+              <PhoneInputWithCountry
+                value={`${waNewNumberCode}${waNewNumber}`}
+                onChange={(_full, code, num) => {
+                  setWaNewNumberCode(code);
+                  setWaNewNumber(num);
+                }}
+                placeholder="010XXXXXXXX"
               />
               <button 
                 onClick={() => {
-                  const num = (document.getElementById('wa_new_number') as HTMLInputElement).value;
-                  if(num) window.open(`https://wa.me/${num.replace(/[^0-9]/g, '')}`, '_blank');
+                  if (!isValidNationalNumber(waNewNumber)) return;
+                  window.open(`https://wa.me/${toWhatsAppNumber(`${waNewNumberCode}${waNewNumber}`)}`, '_blank');
                 }}
                 className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition border border-slate-200 dark:border-slate-700"
               >

@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from "react";
 import { ClientProfile, OpponentProfile, PlatformUser, CaseRecord, UserRole } from "../types";
 import GoldenEagleEmblem from "./GoldenEagleEmblem";
+import PhoneInputWithCountry from "./PhoneInputWithCountry";
+import { phonesMatch, toWhatsAppNumber, toTelHref } from "../utils/authValidation";
 import {
   Phone,
   UserPlus,
@@ -128,7 +130,9 @@ export default function ContactsView({
   const [showAddModal, setShowAddModal] = useState(false);
   const [newName, setNewName] = useState("");
   const [newPhone, setNewPhone] = useState("");
+  const [newPhoneCode, setNewPhoneCode] = useState("+20");
   const [newSecondaryPhone, setNewSecondaryPhone] = useState("");
+  const [newSecondaryPhoneCode, setNewSecondaryPhoneCode] = useState("+20");
   const [newEmail, setNewEmail] = useState("");
   const [newAddress, setNewAddress] = useState("");
   const [newCategory, setNewCategory] = useState<ContactEntry["category"]>("potential_client");
@@ -151,7 +155,7 @@ export default function ContactsView({
 
     // Automatically incorporate all clients as contacts
     clients.forEach((c) => {
-      if (c.phone && !list.some((item) => item.phone === c.phone || item.id === `client-cont-${c.id}`)) {
+      if (c.phone && !list.some((item) => phonesMatch(item.phone, c.phone) || item.id === `client-cont-${c.id}`)) {
         list.push({
           id: `client-cont-${c.id}`,
           name: c.name,
@@ -169,7 +173,7 @@ export default function ContactsView({
 
     // Automatically incorporate all opponents with phone numbers
     opponents.forEach((o) => {
-      if (o.phone && !list.some((item) => item.phone === o.phone || item.id === `opp-cont-${o.id}`)) {
+      if (o.phone && !list.some((item) => phonesMatch(item.phone, o.phone) || item.id === `opp-cont-${o.id}`)) {
         list.push({
           id: `opp-cont-${o.id}`,
           name: o.name,
@@ -272,8 +276,8 @@ export default function ContactsView({
     const newEntry: ContactEntry = {
       id: "cont-" + Date.now(),
       name: newName.trim(),
-      phone: newPhone.trim(),
-      secondaryPhone: newSecondaryPhone.trim() || undefined,
+      phone: `${newPhoneCode}${newPhone.trim()}`,
+      secondaryPhone: newSecondaryPhone.trim() ? `${newSecondaryPhoneCode}${newSecondaryPhone.trim()}` : undefined,
       email: newEmail.trim() || undefined,
       address: newAddress.trim() || undefined,
       category: newCategory,
@@ -552,7 +556,7 @@ export default function ContactsView({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredContacts.map((contact) => {
             const isClient = contact.category === "client";
-            const whatsappUrl = `https://wa.me/2${contact.phone.replace(/^0/, "")}`;
+            const whatsappUrl = `https://wa.me/${toWhatsAppNumber(contact.phone)}`;
 
             return (
               <div
@@ -610,7 +614,7 @@ export default function ContactsView({
                           )}
                         </button>
                         <a
-                          href={`tel:${contact.phone}`}
+                          href={`tel:${toTelHref(contact.phone)}`}
                           className="p-1 bg-amber-500 text-slate-950 rounded hover:bg-amber-600 transition"
                           title="اتصال هاتفي مباشر"
                         >
@@ -722,25 +726,25 @@ export default function ContactsView({
                   <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
                     رقم الهاتف الرئيسي *
                   </label>
-                  <input
-                    type="tel"
+                  <PhoneInputWithCountry
+                    value={`${newPhoneCode}${newPhone}`}
+                    onChange={(_full, code, num) => {
+                      setNewPhoneCode(code);
+                      setNewPhone(num);
+                    }}
                     required
-                    value={newPhone}
-                    onChange={(e) => setNewPhone(e.target.value)}
-                    placeholder="010XXXXXXXX"
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 font-mono font-bold text-slate-900 dark:text-white outline-none focus:border-amber-500"
                   />
                 </div>
                 <div>
                   <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
                     هاتف بديل (اختياري)
                   </label>
-                  <input
-                    type="tel"
-                    value={newSecondaryPhone}
-                    onChange={(e) => setNewSecondaryPhone(e.target.value)}
-                    placeholder="012XXXXXXXX"
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 font-mono text-slate-900 dark:text-white outline-none"
+                  <PhoneInputWithCountry
+                    value={`${newSecondaryPhoneCode}${newSecondaryPhone}`}
+                    onChange={(_full, code, num) => {
+                      setNewSecondaryPhoneCode(code);
+                      setNewSecondaryPhone(num);
+                    }}
                   />
                 </div>
               </div>

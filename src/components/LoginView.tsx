@@ -4,6 +4,15 @@ import { PlatformUser, UserRole } from "../types";
 import { TRANSLATIONS } from "../utils/translations";
 import { License } from "../utils/firebaseSync";
 import { OWNER_PHONES, OWNER_PASSWORD, OWNER_NAME } from "../utils/ownerAccount";
+import {
+  buildFullPhone,
+  isValidEmail,
+  isValidFullName,
+  isValidNationalNumber,
+  phonesMatch,
+  sanitizePhoneDigits,
+  validateLoginFields
+} from "../utils/authValidation";
 import { 
   auth, 
   googleProvider, 
@@ -17,7 +26,6 @@ import {
   UserPlus, 
   Eye, 
   ShieldCheck, 
-  Mail, 
   CheckCircle, 
   Smartphone, 
   Globe, 
@@ -62,8 +70,6 @@ export default function LoginView({
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
 
   // When portal changes, set appropriate default role
   const handlePortalSwitch = (portal: "lawyers_admin" | "clients_users") => {
@@ -127,40 +133,50 @@ export default function LoginView({
 
   const t = (key: string) => TRANSLATIONS[key]?.[language] || key;
 
-  // Regular Email/Phone + Password Login Handler
+  // Phone-only login handler: mobile number (with its own country code) + password.
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
-    
-    const fullPhone = phoneCode + phone;
-    const normalizedEmail = email.trim().toLowerCase();
-    const normalizedName = fullName.trim().toLowerCase();
 
-    if (!phone.trim() && !normalizedEmail) {
-      setErrorMsg(language === "ar"
-        ? "برجاء إدخال رقم الهاتف المحمول أو البريد الإلكتروني."
-        : "Please enter your mobile number or email.");
+    const validation = validateLoginFields({
+      countryCode: phoneCode,
+      nationalNumber: phone,
+      password
+    });
+
+    if (!validation.valid) {
+      if (validation.reason === "phone_required") {
+        setErrorMsg(language === "ar"
+          ? "برجاء إدخال رقم الهاتف المحمول (أرقام فقط)."
+          : "Please enter your mobile number (digits only).");
+      } else if (validation.reason === "phone_invalid") {
+        setErrorMsg(language === "ar"
+          ? "رقم الهاتف غير صحيح: يجب أن يحتوي على أرقام فقط مع كود الدولة."
+          : "Invalid phone number: digits only, with a country code.");
+      } else {
+        setErrorMsg(language === "ar"
+          ? "برجاء إدخال كلمة المرور."
+          : "Please enter your password.");
+      }
       return;
     }
 
-    // Account identification: mobile number or email, narrowed by the full name when entered.
-    const matchesIdentity = (u: PlatformUser) => {
-      const phoneOk = !!phone.trim() && (u.phone === fullPhone || u.phone === phone);
-      const emailOk = !!normalizedEmail && !!u.email && u.email.trim().toLowerCase() === normalizedEmail;
-      const nameOk = !normalizedName || (u.name || "").toLowerCase().includes(normalizedName);
-      return (phoneOk || emailOk) && nameOk;
-    };
+    const fullPhone = validation.fullPhone;
+    const nationalNumber = sanitizePhoneDigits(phone);
+
+    // Account identification is the mobile number only (local or international form).
+    const matchesIdentity = (u: PlatformUser) =>
+      phonesMatch(u.phone, fullPhone) || phonesMatch(u.phone, nationalNumber);
 
     // Portal 1: Lawyers & Admin
     if (activePortal === "lawyers_admin") {
       // Owner master account
-      if (OWNER_PHONES.includes(phone.trim()) || OWNER_PHONES.includes(fullPhone)) {
+      if (OWNER_PHONES.some((ownerPhone) => phonesMatch(ownerPhone, fullPhone))) {
         if (password === OWNER_PASSWORD) {
           const adminUser: PlatformUser = {
             id: "usr-admin",
             name: OWNER_NAME,
             phone: "+201283233555",
-            email: email.trim() || undefined,
             passwordHash: OWNER_PASSWORD,
             role: UserRole.ADMIN,
             isVerified: true,
@@ -206,7 +222,7 @@ export default function LoginView({
         (u) => matchesIdentity(u) && 
                u.passwordHash === password && 
                [UserRole.CLIENT, UserRole.SEEKER, UserRole.OPPONENT].includes(u.role) &&
-               u.lawFirmPhone === (lawFirmPhoneCode + lawFirmPhone)
+               phonesMatch(u.lawFirmPhone, buildFullPhone(lawFirmPhoneCode, lawFirmPhone))
       );
 
       if (matchedUser) {
@@ -361,8 +377,24 @@ export default function LoginView({
       }
     }
 
-    if (signupPhone.length < 9) {
-      setErrorMsg(language === "ar" ? "يرجى كتابة رقم هاتف صحيح." : "Please enter a valid mobile phone.");
+    if (!isValidFullName(signupName)) {
+      setErrorMsg(language === "ar"
+        ? "يرجى كتابة الاسم الكامل بحروف فقط (3 أحرف على الأقل)."
+        : "Please enter a valid full name (letters only, at least 3 characters).");
+      return;
+    }
+
+    if (signupEmail.trim() && !isValidEmail(signupEmail)) {
+      setErrorMsg(language === "ar"
+        ? "صيغة البريد الإلكتروني غير صحيحة. مثال: name@example.com"
+        : "Invalid email format. Example: name@example.com");
+      return;
+    }
+
+    if (!isValidNationalNumber(signupPhone)) {
+      setErrorMsg(language === "ar"
+        ? "يرجى كتابة رقم هاتف صحيح (أرقام فقط) مع كود الدولة."
+        : "Please enter a valid mobile phone (digits only) with its country code.");
       return;
     }
 
@@ -570,36 +602,11 @@ export default function LoginView({
           {/* NORMAL LOGIN FRAME */}
           {!isSignUp ? (
             <form onSubmit={handleLoginSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 text-right mb-1">
-                    {language === "ar" ? "الاسم الكامل" : "Full Name"}
-                  </label>
-                  <input
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder={language === "ar" ? "الاسم ثلاثياً أو رباعياً" : "Full name"}
-                    className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 rounded-xl border border-slate-200 dark:border-slate-800 text-right outline-none font-bold text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 text-right mb-1">
-                    {language === "ar" ? "البريد الإلكتروني" : "Email"}
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="email"
-                      dir="ltr"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="name@example.com"
-                      className="w-full pl-10 pr-3 py-2.5 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 rounded-xl border border-slate-200 dark:border-slate-800 text-left outline-none font-bold text-xs"
-                    />
-                    <Mail className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-                  </div>
-                </div>
-              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed text-right">
+                {language === "ar"
+                  ? "تسجيل الدخول لجميع المستخدمين يتم برقم الهاتف المحمول فقط مع كود الدولة وكلمة المرور."
+                  : "All users sign in with their mobile number (country code + number) and password only."}
+              </p>
 
               {activePortal === "clients_users" && (
                 <div>
